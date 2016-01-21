@@ -1,0 +1,11 @@
+{
+  "name": "cb",
+  "version": "0.0.0",
+  "private": true,
+  "dependencies": {
+    "apn": "^1.7.5",
+    "compute-cluster": "0.0.9",
+    "debug": "^2.2.0",
+    "ws": "^1.0.1"
+  }
+}

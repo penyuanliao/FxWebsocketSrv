@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<br lang="en" xmlns="http://www.w3.org/1999/html">
+<head>
+    <meta charset="UTF-8">
+    <title> Rtmp > ffmpeg > websocket > Broadway Player</title>
+    <style>
+        button {
+            width: 100px;
+            display:inline-block;
+            padding-bottom: 10px;
+            padding-top: 10px;
+            margin: 0px 0px 5px 05px;
+            border-radius:4px;
+            border: 1px solid transparent;
+            background-color: #5bc0de;
+            border-color: #46b8da;
+            color: white;
+        }
+        button[disabled] {
+            background-color: #d9534f;
+            border-color: #d43f3a;
+        }
+
+    </style>
+    <script type="text/javascript" src="../js/broadway/Decoder.js"></script>
+    <script type="text/javascript" src="../js/broadway/YUVWebGLCanvas.js"></script>
+    <script type="text/javascript" src="../js/broadway/Player.js"></script>
+
+    <script type="text/javascript" src="../js/broadway/stream.js"></script>
+</head>
+<br>
+<script type="text/javascript">
+    window.onload = load;
+
+    function load() {
+        var nodes = document.querySelectorAll('div.broadway');
+//        for (var i = 0; i < nodes.length; i++) {
+//            var broadway = new Broadway(nodes[i]);
+////            broadway.decode()
+//            // broadway.play();
+//        };
+
+        var player = createPlayer(nodes[0]); // 播放器
+        var ws; // websocket連線
+        var selectBtn;
+        var decode = new Decoder();
+        var st,group;
+
+        player.onPictureDecoded = function (buffer, width, height, infos) {
+//            console.log('onPictureDecoded',buffer.length, width, height, infos);
+            endTime();
+        };
+
+        function createPlayer(node) {
+            var player = new Player({
+                useWorker: false,
+                workerFile: "../js/broadway/Decoder.js"
+                ,size: { width: 640, height: 300 }
+            });
+
+            node.appendChild(player.canvas);
+
+            return player;
+        };
+
+        var toUint8Array = function(parStr){
+            //console.log(parStr);
+            var raw = window.atob(parStr);
+            var rawLength = raw.length;
+            var array = new Uint8Array(new ArrayBuffer(rawLength));
+
+            var i;
+            for(i = 0; i < rawLength; i++) {
+                array[i] = raw.charCodeAt(i);
+            }
+            return array;
+        };
+
+        var liveList = ["live1","live2","live3","live4","live5","live6","live7"];
+
+        for (var i = 0; i < liveList.length; i++) {
+            var obj = liveList[i];
+            var button = document.getElementById(obj);
+            button.onclick = onClickHandle;
+        }
+
+        function onClickHandle(e) {
+
+            if (typeof selectBtn != 'undefined' && selectBtn != null) {
+                selectBtn.disabled = false;
+            }
+
+            var btn = this;
+            selectBtn = btn;
+            btn.disabled = true;
+            if (typeof ws != 'undefined' && ws != null)
+            {
+                console.log('ws close onClickHandle');
+                ws.close();
+//                var context = player.canvas.getContext('webgl');;
+//                console.log(context);
+//                context.clearColor(0.0, 0.0, 0.0, 1.0);
+//                context.clear(context.COLOR_BUFFER_BIT);
+                ws.removeEventListener("open", onCloseHandle);
+                ws.removeEventListener("close", onOpenHandle);
+                ws.removeEventListener("message", onMessageHandle);
+                nodes[0].removeChild(player.canvas);
+                player = null;
+                player = createPlayer(nodes[0]);
+            };
+
+            liveStream(btn.value);
+        }
+
+        function liveStream(namespace) {
+            var quality = document.getElementById('quality').value;
+            console.log(quality);
+            var wsURL = 'ws://' + location.host + '/video/'+ namespace +'/' + quality + '/';
+            ws = new WebSocket(wsURL);
+            ws.onopen = onOpenHandle;
+            ws.onclose = onCloseHandle;
+            ws.onmessage = onMessageHandle;
+
+            connts();
+        };
+        function onCloseHandle(evt) {
+            console.log('websocket on disconnect.');
+        };
+        function onOpenHandle(evt){
+            console.log('websocket on connected.');
+            ws.send("hi server");
+        };
+        function onMessageHandle(evt) {
+//            console.log('data connected.',evt);
+            var json = JSON.parse(evt.data);
+
+            if (json.NetStreamEvent === "NetStreamData") {
+                var bin = toUint8Array(json.data);
+                player.decode(bin);
+//                decode.decode(bin);
+                connecttd();
+                startTime();
+            }
+
+        };
+
+        function once(fn, context) {
+            var result;
+
+            return function () {
+                if (fn) {
+                    result = fn.apply(context || this, arguments);
+                    fn = null;
+                }
+
+                return result;
+            };
+        };
+        var connts = once(function () {
+            st = new Date().getTime();
+        });
+        var connecttd = once(function () {
+            var time = new Date().getTime() - st;
+            console.log('Execution time:', time, 'ms');
+            var nodes = document.querySelectorAll('div.timer');
+            var p = document.createElement('p');
+            p.textContent = "(Connected)Execution time:" + time + "ms (" + time/1000 + ")";
+            nodes[0].appendChild(p);
+        });
+        var startTime = once(function () {
+           st = new Date().getTime();
+            console.log('runing...');
+        });
+        var endTime = once(function () {
+            var time = new Date().getTime() - st;
+            console.log('(Decoder)Execution time:', time, 'ms');
+            var nodes = document.querySelectorAll('div.timer');
+            var p = document.createElement('p');
+            p.textContent = "Execution time:" + time + "ms (" + time/1000 + " sec)";
+            nodes[0].appendChild(p);
+        });
+        //壓測用
+        function abtest(){
+            var button = document.getElementById("abtesting");
+            button.onclick = function (e) {
+                var name = document.getElementById("videoName");
+                var cunt = document.getElementById("runcount");
+                console.log(name.value,cunt.value);
+                group = [];
+                for (var i = 0; i < parseInt(cunt.value); i++) {
+                    console.log('start');
+                    var wsURL = 'ws://' + location.host + '/video/' + name.value +"/video0";
+                    var ws = new WebSocket(wsURL);
+                    ws.onopen = function (evt) { };
+                    ws.onclose = function (evt){
+                        console.log('close:' + name.value);
+                    };
+                    ws.onmessage = function (evt) { };
+                    group.push(ws);
+                };
+
+            };
+        }
+
+        abtest();
+
+    };
+</script>
+
+    <div class="broadway" width="640" height="300" style="float: left; position: relative;" workers="false" render="true" webgl="auto"></div>
+    </br>
+    <p style="display: inline-block; width: 100%">
+        <button id="live1" class="button" value="daabb" >BaccaratA</button>
+        <button id="live2" value="daabc">BaccaratB</button>
+        <button id="live3" value="daabd">BaccaratC</button>
+        <button id="live4" value="daabg">BaccaratD</button>
+        <button id="live5" value="daabh">BaccaratE</button>
+        <button id="live6" value="daabdg">BaccaratI</button>
+        <button id="live7" value="daabdh">BaccaratJ</button></br></p>
+        <p>Quality:
+            <select id="quality" style="width: 240px;height: 34px; overflow: hidden; border: 1px solid #ccc;">
+                <option selected="selected">video0</option>
+                <option>sd</option>
+                <option>hd</option>
+            </select>
+        </p>
+    </div>
+    <p>----- 分隔線以下測試用 -----</p>
+    <p>Test count: <input id="runcount" value="1"/></p>
+    <p>URL: <input id="videoName" value="daabc" style="width: 300px"/></p>
+    <p><button id="abtesting">test</button></p>
+
+    <div class="timer"></div>
+</body>
+</html>
