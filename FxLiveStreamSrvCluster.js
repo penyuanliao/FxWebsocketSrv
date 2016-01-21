@@ -87,7 +87,7 @@ function initizatialSrv() {
 
     utilities.autoReleaseGC(); //** 手動 1 sec gc
 
-    var srv = new FxConnection(cfg.appConfig.port);
+    var srv = new FxConnection(cfg.appConfig.port,{'cluster':4});
     setupCluster(srv);
     server = srv;
 }

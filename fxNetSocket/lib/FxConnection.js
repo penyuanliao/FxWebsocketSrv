@@ -47,10 +47,13 @@ function FxConnection(port, option){
     this.server = this.app.listen(port, function () {
         console.log('Listening on ' + app.address().port);
 
+        if (typeof option === 'undefined') {
+            option = {'cluster':0};
+        }
+
         /** cluster start **/
-        if (typeof port === "number") { // isMaster
-            var numCPUs = 1; //require('os').cpus().length;
-            for (var i = 0; i < numCPUs; i++) {
+        if (typeof port === "number" && option.cluster != 0) { // isMaster
+            for (var i = 0; i < option.cluster; i++) {
 
                 var cluster = proc.fork('./FxLiveStreamSrvCluster.js',{silent:false});
                 cluster.id = i;

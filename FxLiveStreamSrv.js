@@ -201,7 +201,7 @@ function swpanedUpdate(base64) {
         var socket = clients[keys[i]];
         if (socket.isConnect == true) {
             if (socket.namespace === spawnName)
-                socket.stream(JSON.stringify({"NetStreamEvent":"NetStreamData",data:base64}));
+                socket.write(JSON.stringify({"NetStreamEvent":"NetStreamData",data:base64}));
         }
     }
     keys = null;
