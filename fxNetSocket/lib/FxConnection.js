@@ -8,7 +8,7 @@ var tls = require('tls'), // SSL certificate
 var net = require('net');
 var util = require('util');
 var events = require('events');
-var proc = require('child_process');
+
 var fxSocket = require('./FxSocket.js');
 
 var logger = require('./FxLogger.js');
@@ -20,7 +20,6 @@ var clients = []; // 紀錄使用者
 var clusterJS = "FxLiveStreamSrvCluster.js";
 
 util.inherits(FxConnection, events.EventEmitter); // 繼承事件
-
 
 // todo enum event dispach
 
@@ -44,32 +43,16 @@ function FxConnection(port, option){
 
     /* Codes */
 
-    this.server = this.app.listen(port, function () {
+    var cb = function () {
         console.log('Listening on ' + app.address().port);
 
-        if (typeof option === 'undefined') {
-            option = {'cluster':0};
-        }
+        self.emit("Listening", app);
 
-        /** cluster start **/
-        if (typeof port === "number" && option.cluster != 0) { // isMaster
-            for (var i = 0; i < option.cluster; i++) {
 
-                var cluster = proc.fork('./FxLiveStreamSrvCluster.js',{silent:false});
-                cluster.id = i;
-                cluster.send(0, app._handle);
+    }
 
-                cluster.on('message', function (msg) {
-                    console.log("serv", msg);
-                });
-                self.clusters.push(cluster);
 
-            };
-            app.close();
-        };
-
-        /** cluster ended **/
-    });
+    this.server = this.app.listen(port, cb);
 
     this.app.on('connection', function(socket) {
 

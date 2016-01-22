@@ -3,7 +3,7 @@
  * --always-compact: always full gc().
  * --expose-gc: manual gc().
  */
-
+var debug = require('debug')('LiveCluster');
 var fxNetSocket = require('./fxNetSocket');
 var FxConnection = fxNetSocket.netConnection;
 var outputStream = fxNetSocket.stdoutStream;
@@ -14,6 +14,7 @@ var fs  = require('fs');
 var net  = require('net');
 var evt = require('events');
 var cfg = require('./config.js');
+var proc = require('child_process');
 /** 所有視訊stream物件 **/
 var liveStreams = {};
 var isMaster = (process.argv.length > 3);
@@ -68,13 +69,7 @@ process.on('message', function(data , handle) {
 
 });
 
-var proc_pipe =  new net.Socket({ fd: 0 });
-if (typeof  proc_pipe !== 'undefined') {
 
-    proc_pipe.on('data', function (chunk) {
-        console.log('chunk:', chunk);
-    });
-}
 
 if (isMaster) initizatialSrv();
 
@@ -82,7 +77,7 @@ if (isMaster) initizatialSrv();
 
 function initizatialSrv() {
     /** createLiveStreams **/
-    createLiveStreams(cfg.appConfig.fileName);
+    //createLiveStreams(cfg.appConfig.fileName);
     setInterval(observerTotoalUseMem,60000); // testing code 1.0 min
 
     utilities.autoReleaseGC(); //** 手動 1 sec gc
@@ -93,6 +88,34 @@ function initizatialSrv() {
 }
 
 function setupCluster(srv) {
+    
+    srv.on('Listening', function (app) {
+        console.log('Listening...');
+        var option = {'cluster':1};
+        if (typeof option === 'undefined') {
+            option = {'cluster':0};
+        }
+        /** cluster start **/
+        if (isMaster && option.cluster != 0) { // isMaster
+            for (var i = 0; i < option.cluster; i++) {
+
+                var cluster = proc.fork('./FxLiveStreamSrvCluster.js',{silent:false});
+                cluster.id = i;
+                cluster.send(0, app._handle);
+
+                cluster.on('message', function (msg) {
+                    console.log("serv", msg);
+                });
+                srv.clusters.push(cluster);
+
+            };
+            app.close();
+        };
+        /** cluster ended **/
+
+    });
+    
+    
     srv.on('connection', function (socket) {
         console.log('clients:',socket.name);
 

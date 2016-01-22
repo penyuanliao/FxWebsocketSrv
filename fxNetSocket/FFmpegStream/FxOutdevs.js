@@ -53,7 +53,7 @@ function FxOutdevs(fileName) {
         //    "-preset:v", "ultrafast", "-tune:v", "zerolatency", "-f", "h264", "pipe:1"];
         // -r set 10 fps for flv streaming source.
         // -- , "-pass", "1"
-        var params = ["-y", "-i", _fileName + ' live=1', "-loglevel", avLog.quiet, "-r", "10", "-b:v", "300k", "-b:a", "8k", "-bt", "10k", "-vcodec", "libx264", "-coder", "0", "-bf", "0", "-timeout", "1", "-flags", "-loop", "-wpredp", "0", "-an", "-preset:v", "ultrafast", "-tune", "zerolatency","-level:v", "5.2", "-f", "h264", "pipe:1"];
+        var params = ["-y", "-i", _fileName, "-loglevel", avLog.quiet, "-r", "10", "-b:v", "300k", "-b:a", "8k", "-bt", "10k", "-vcodec", "libx264", "-coder", "0", "-bf", "0", "-timeout", "1", "-flags", "-loop", "-wpredp", "0", "-an", "-preset:v", "ultrafast", "-tune", "zerolatency","-level:v", "5.2", "-f", "h264", "pipe:1"];
         var fmParams = " " + (params.toString()).replace(/[,]/g, " ");
         console.log("ffmpeg " + fmParams);
 
