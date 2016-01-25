@@ -1,7 +1,7 @@
 /**
  * Created by Benson.Liao on 2015/11/20.
  */
-
+var debug = require('debug')('Socket');
 var parser = require('./FxParser.js');
 
 /***
@@ -85,7 +85,7 @@ FxSocket.prototype.readByteArray = function(data) {
 };
 
 FxSocket.prototype.close = function () {
-    console.log('socket destroy :', this.name);
+    debug('socket destroy :', this.name);
     this.socket.destroy();
 };
 

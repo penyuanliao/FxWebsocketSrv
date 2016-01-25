@@ -1,6 +1,7 @@
 /**
  * Created by Benson.Liao on 15/12/8.
  */
+var debug = require('debug')('Outdevs');
 var events = require('events');
 var util = require('util');
 var _fileName,
@@ -55,7 +56,7 @@ function FxOutdevs(fileName) {
         // -- , "-pass", "1"
         var params = ["-y", "-i", _fileName, "-loglevel", avLog.quiet, "-r", "10", "-b:v", "300k", "-b:a", "8k", "-bt", "10k", "-vcodec", "libx264", "-coder", "0", "-bf", "0", "-timeout", "1", "-flags", "-loop", "-wpredp", "0", "-an", "-preset:v", "ultrafast", "-tune", "zerolatency","-level:v", "5.2", "-f", "h264", "pipe:1"];
         var fmParams = " " + (params.toString()).replace(/[,]/g, " ");
-        console.log("ffmpeg " + fmParams);
+        debug("ffmpeg " + fmParams);
 
         this.ffmpeg = spawn("ffmpeg", params);
 
@@ -66,7 +67,7 @@ function FxOutdevs(fileName) {
         var stream_data = "";
 
         var streamDataHandler = function (chunk) {
-            //console.log("[OUTPUT] %d bytes", chunk.length);
+            //debug("[OUTPUT] %d bytes", chunk.length);
             try {
                 if (!(chunk && chunk.length)) {
                     throw new Error("[Error] - Data is NULL.");
@@ -81,7 +82,7 @@ function FxOutdevs(fileName) {
                 // CHECK stdout cmdline單列指令長度是否已經是8192(win平台不確定)
                 if (chunk.length < 8192) {
                     //self.streamdata = stream_data.toString('base64');
-                    //console.log("[Total] %d bytes", stream_data.length);
+                    //debug("[Total] %d bytes", stream_data.length);
                     self.emit('streamData',stream_data.toString('base64'));
                     stream_data.writeUIntLE(0, 0, stream_data.length);
                     stream_data = ""; // reset stream
@@ -90,38 +91,38 @@ function FxOutdevs(fileName) {
                 }
             }
             catch (e) {
-                console.log("Stream::", e);
+                debug("Stream::", e);
             }
 
         };
 
         var stderrDataHanlder = function (buf) {
             var str = String(buf);
-            console.log('[INFO] stderr info::', str);
+            debug('[INFO] stderr info::', str);
             //  1. Network is unreachable
             //  2. Cannot open connection
         };
 
         var stdoutCloseHandler = function(code) {
-            console.log(self.name + ' you are terminated.');
+            debug(self.name + ' you are terminated.');
             logger.debug("[Close] close_event - Child process exited with code " + code);
             self.running = false;
             self.STATUS = stdoutStatus.CLOSE;
             self.emit('close', code);
         };
         var stdoutExitHandler = function() {
-            console.log('[Debug] Hasta la vista, baby!');
+            debug('[Debug] Hasta la vista, baby!');
             self.running = false;
             self.emit('exit');
             logger.debug("[Exit] Exit_event - Child process exited ");
         };
         var readableHandler = function () {
-            console.log('[Debug] readable first stream in here.');
+            debug('[Debug] readable first stream in here.');
             logger.debug("[readable] readable_evnt - readable first stream in here.");
         };
 
         var streamErrorHandler = function(err) {
-            console.log("[ERROR] Some stream error: ", err);
+            debug("[ERROR] Some stream error: ", err);
             logger.debug("[streamError] Some stream error: " + err);
             self.running = false;
             self.STATUS = stdoutStatus.ERROR;
@@ -137,7 +138,7 @@ function FxOutdevs(fileName) {
         this.ffmpeg.on("exit",stdoutExitHandler); //
 
         this.ffmpeg.on('disconnect', function() {
-            console.log('Worker has disconnected');
+            debug('Worker has disconnected');
         });
 
         this.streamDelegate.on("readable", readableHandler);
@@ -146,7 +147,7 @@ function FxOutdevs(fileName) {
 
     }
     catch (e) {
-        console.log('[ERROR]createServer::', e);
+        debug('[ERROR]createServer::', e);
         logger.debug("FxOutdevs Exception ERRORS: " + e);
     }
 
@@ -176,5 +177,5 @@ module.exports = exports = FxOutdevs;
 
 //var fx = new FxOutdevs("url");
 //fx.on('streamData', function (base64) {
-//    console.log('Data Length', base64.length);
+//    debug('Data Length', base64.length);
 //});

@@ -17,23 +17,18 @@ var cfg = require('./config.js');
 var proc = require('child_process');
 /** 所有視訊stream物件 **/
 var liveStreams = {};
-var isMaster = (process.argv.length > 3);
+/** 多執行緒 **/
+var cluster = require('cluster');
+var isWorker = ('NODE_CDID' in process.env);
+var isMaster = (isWorker === false);
 var server;
 /** cluster start **/
-/*var cluster = require('cluster');
- if (cluster.isMaster) {
- for (var i = 0; i < 3; i++) {
- cluster.fork();
- }
- }else{
-
- }*/
 process.on('message', function(data , handle) {
 
     if (data == 0) {
         isMaster = false;
 
-        console.log('[Runnable] Create cluster id:',data );
+        debug('[Runnable] Create cluster id:',data );
 
         var self = this;
 
@@ -52,7 +47,6 @@ process.on('message', function(data , handle) {
         if (keys.length == 0) return;
         for (var i = 0 ; i < keys.length; i++) {
             var socket = clients[keys[i]];
-            console.log(socket.namespace , spawnName);
             if (socket.isConnect == true) {
                 if (socket.namespace == spawnName)
                 {
@@ -78,7 +72,7 @@ if (isMaster) initizatialSrv();
 function initizatialSrv() {
     /** createLiveStreams **/
     //createLiveStreams(cfg.appConfig.fileName);
-    setInterval(observerTotoalUseMem,60000); // testing code 1.0 min
+    setInterval(observerTotoalUseMem, 60000); // testing code 1.0 min
 
     utilities.autoReleaseGC(); //** 手動 1 sec gc
 
@@ -90,7 +84,7 @@ function initizatialSrv() {
 function setupCluster(srv) {
     
     srv.on('Listening', function (app) {
-        console.log('Listening...');
+        debug('Listening...');
         var option = {'cluster':1};
         if (typeof option === 'undefined') {
             option = {'cluster':0};
@@ -99,7 +93,10 @@ function setupCluster(srv) {
         if (isMaster && option.cluster != 0) { // isMaster
             for (var i = 0; i < option.cluster; i++) {
 
-                var cluster = proc.fork('./FxLiveStreamSrvCluster.js',{silent:false});
+                // file , fork.settings, args
+                var env = process.env;
+                env.NODE_CDID = i;
+                var cluster = proc.fork('./FxLiveStreamSrvCluster.js',{silent:false}, {env:env});
                 cluster.id = i;
                 cluster.send(0, app._handle);
 

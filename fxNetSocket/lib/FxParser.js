@@ -121,7 +121,6 @@ Headers.prototype.readHeaders = function (chunk) {
 
         headers[match[1].toLowerCase()] = match[2];
     };
-    console.log(this.name);
     return headers;
 };
 /**
@@ -262,7 +261,6 @@ Protocols.prototype.readFraming = function (buffer) {
     //set final buffer size
     buffer = buffer.slice(protocol.start + len);
     protocol.msg = protocol.payload.toString();
-    //console.log(protocol.msg);
     // Proceeds to frame processing
     return protocol;
 };

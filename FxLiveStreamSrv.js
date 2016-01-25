@@ -4,6 +4,7 @@
  * --expose-gc: manual gc().
  */
 
+var debug = require('debug')('Live');
 var fxNetSocket = require('./fxNetSocket');
 var FxConnection = fxNetSocket.netConnection;
 var outputStream = fxNetSocket.stdoutStream;
@@ -24,7 +25,7 @@ setInterval(observerTotoalUseMem,60000); // testing code 1.0 min
 utilities.autoReleaseGC(); //** 手動 1 sec gc
 var srv = new FxConnection(cfg.appConfig.port);
 srv.on('connection', function (socket) {
-    console.log('clients:',socket.name);
+    debug('clients:',socket.name);
     // 檢查 Stream List 建立
     if (typeof liveStreams != 'undefined' && liveStreams != null ) {
         var swpan = liveStreams[socket.namespace];
@@ -34,7 +35,7 @@ srv.on('connection', function (socket) {
 
             var confirm = verificationString(socket.namespace);
             // 特殊需求這邊本來應該return;如果連線指定伺服器啟動」
-            console.log("rtmp://" + cfg.videoDomainName + socket.namespace , confirm);
+            debug("rtmp://" + cfg.videoDomainName + socket.namespace , confirm);
             if (confirm) {
                 createLiveStreams(["rtmp://" + cfg.videoDomainName + socket.namespace]);
             }else
@@ -52,11 +53,11 @@ srv.on('connection', function (socket) {
 });
 /** socket data event **/
 srv.on('message', function (data) {
-    console.log('message :',data);
+    debug('message :',data);
 });
 /** client socket destroy **/
 srv.on('disconnect', function (socket) {
-    console.log('disconnect_fxconnect_client.');
+    debug('disconnect_fxconnect_client.');
     //socket.removeListener('connection', callback);
 });
 /** verification **/
@@ -77,7 +78,7 @@ function verificationString(str) {
  * **/
 srv.on('httpUpgrade', function (req, client, head) {
 
-    console.log('## upgrade ##');
+    debug('## upgrade ##');
 
     var _get = head[0].split(" ");
 
@@ -108,14 +109,14 @@ srv.on('httpUpgrade', function (req, client, head) {
         });
         fsstream.on('end', function () {
             //var file = Buffer.concat(list).toString();
-            console.log("%s file size : %d kb",_get[1],fileLength/1024);
+            debug("%s file size : %d kb",_get[1],fileLength/1024);
             //socket.write("content-length:%d\r\n", fileLength);
 
             //client.close();
 
         });
         fsstream.on('error', function (err) {
-            console.log('fsStream error:', err);
+            debug('fsStream error:', err);
         });
 
     }
@@ -180,7 +181,7 @@ function createLiveStreams(fileName) {
 /** 重啟stream **/
 function rebootStream(spawned,skip) {
     if ((spawned.running == false && spawned.STATUS >= 2) || skip == true) {
-        console.log('>>rebootStream:', spawned.name);
+        debug('>>rebootStream:', spawned.name);
         var spawn = liveStreams[spawned.name] = new outputStream( "rtmp://" + cfg.videoDomainName + spawned.name);
         spawn.idx = spawned.idx;
         spawn.name = spawned.name;
@@ -234,7 +235,7 @@ function swpanedClosed(code){
 
     //** 監聽到自動關閉,重新啟動 code == 0 **/
     if (1) {
-        console.log("listen swpaned Closed - ",this.name, " < REBOOTING >");
+        debug("listen swpaned Closed - ",this.name, " < REBOOTING >");
         rebootStream(this,true);
     }
 

@@ -2,6 +2,7 @@
  * Created by Benson.Liao on 2015/11/20.
  */
 "use strict";
+var debug = require('debug')('Connect');
 var crypto = require("crypto");
 var tls = require('tls'), // SSL certificate
     fs = require('fs');
@@ -44,7 +45,7 @@ function FxConnection(port, option){
     /* Codes */
 
     var cb = function () {
-        console.log('Listening on ' + app.address().port);
+        debug('Listening on ' + app.address().port);
 
         self.emit("Listening", app);
 
@@ -66,7 +67,7 @@ function FxConnection(port, option){
             {
                 client.isConnect = true;
                 addUpdateData(mode);
-                // console.log("[INFO] Add client mode:",client.mode);
+                // debug("[INFO] Add client mode:",client.mode);
                 clients[client.name] = client; //TODO 二維分組namespace物件
             } else {
                 //var http = data.toString('utf8');
@@ -105,7 +106,7 @@ function FxConnection(port, option){
     });
 
     function sockDidClosed() {
-        console.log('LOG::SOCKET WILL CLOSED : COUNT(%d)',Object.keys(clients).length -1);
+        debug('LOG::SOCKET WILL CLOSED : COUNT(%d)',Object.keys(clients).length -1);
 
         var socket = this;
         var index = clients.indexOf(socket.name);
@@ -117,13 +118,13 @@ function FxConnection(port, option){
     };
 
     function sockDidEnded() {
-        console.log('LOG::SOCKET ENDED');
+        debug('LOG::SOCKET ENDED');
         var socket = this;
         socket.end();
     };
 
     function sockDidErrored(e) {
-        console.log('LOG::SOCKET ERROR');
+        debug('LOG::SOCKET ERROR');
         self.emit('error', e);
     };
 
@@ -184,17 +185,17 @@ FxConnection.prototype.FxTLSConnection = function (option){
     var self = this.self;
 
     tls.createServer(options, function (socket) {
-        console.log('TLS Client connection established.');
+        debug('TLS Client connection established.');
 
         // Set listeners
         socket.on('readable', function () {
-            console.log('TRACE :: Readable');
+            debug('TRACE :: Readable');
 
         });
 
         var client = new fxSocket(socket);
         socket.on('data', function (data) {
-            console.log('::TRACE DATA ON STL CLIENT');
+            debug('::TRACE DATA ON STL CLIENT');
             sockDidData(client, data, self);
         });
 
@@ -214,16 +215,16 @@ var findOutSocketConnected = function (client, chunk, self) {
     var swfPolicy = request_headers.match("<policy-file-request/>") == null; // Flash Policy
     var iswebsocket = request_headers.match('websocket') != null; // Websocket Protocol
 
-    //console.log('LOG::Data received: ');
+    //debug('LOG::Data received: ');
 
     if (unicodeNull != null && swfPolicy && client.mode != 'ws') {
-        console.log('[SOCKET_NET_CONNECTED]:');
+        debug('[SOCKET_NET_CONNECTED]:');
         client.mode = fxStatus.flashSocket;
 
         self.emit('message', client.read(request_headers));
 
     }else if (iswebsocket) {
-        console.log('[WEBSOCKET_CONNECTED]');
+        debug('[WEBSOCKET_CONNECTED]');
 
         client.mode = 'ws';
 
@@ -239,16 +240,16 @@ var findOutSocketConnected = function (client, chunk, self) {
     }
     else if (client.mode === fxStatus.websocket)
     {
-        console.log('[WEBSOCKET_ROGER]');
+        debug('[WEBSOCKET_ROGER]');
         // check is a websocket framing
 
         var str = client.read(chunk);
         var opcode = client.protocol.opcode;
 
-        console.log("PROTOCOL::", opcode);
+        debug("PROTOCOL::", opcode);
     }else
     {
-        console.log('[OTHER CONNECTED]');
+        debug('[OTHER CONNECTED]');
 
         if (httpTag.length != 0 && iswebsocket == false)
         {
@@ -299,13 +300,13 @@ module.exports = FxConnection;
 //var s = new FxConnection(8080);
 //s.FxTLSConnection(null);
 //s.on('connection', function (socket) {
-//    console.log('clients:',socket.name);
-//    console.log(s.clientsCount());
+//    debug('clients:',socket.name);
+//    debug(s.clientsCount());
 //});
 //s.on('message', function (data) {
-//    console.log("TRACE",data);
+//    debug("TRACE",data);
 //});
 //s.on('disconnect', function (socket) {
-//    console.log('disconnect_fxconnect_client.')
+//    debug('disconnect_fxconnect_client.')
 //});
 

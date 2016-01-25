@@ -1,7 +1,7 @@
 /**
  * Created by Benson.Liao on 15/12/21.
  */
-
+var debug = require('debug')('Logger');
 var fs = require('fs'),
     util = require('util'),
     exec = require('child_process'),
@@ -16,7 +16,7 @@ logger.prototype.debug = function (d) {
     var time = new Date();
     var st = "[" + time.getFullYear() + "/" + (time.getMonth() + 1) + "/" + time.getDate() + " " + time.getHours() + ":" + time.getMinutes() + "]";
     log_file.write(st + util.format(d) + '\r\n'); // win:\r\n linux:\n mac:\r
-    //console.log(st, util.format(d));
+    //debug(st, util.format(d));
 };
 /**
  * polling set timer run child process state.
@@ -42,18 +42,18 @@ logger.prototype.pollingWithProcess = function(proc, name, delay) {
         if (typeof proc != 'undefined' && (proc !== null) && proc !== "") {
 
             if (parseInt(proc.exitCode) === 255) {
-                console.log("[Polling-255] ffmpeg " + name + " process to Shutdown. (use kill -15 PID) -proc.exitCode=" + proc.exitCode + " -proc.killed=" + proc.killed + " -proc.signalCode=" + proc.signalCode);
+                debug("[Polling-255] ffmpeg " + name + " process to Shutdown. (use kill -15 PID) -proc.exitCode=" + proc.exitCode + " -proc.killed=" + proc.killed + " -proc.signalCode=" + proc.signalCode);
                 logger.instance.debug("[Polling] ffmpeg " + name + " process to Shutdown. (use kill -15 PID) -proc.exitCode=" + proc.exitCode + " -proc.killed=" + proc.killed + " -proc.signalCode=" + proc.signalCode);
             }else if (proc.signalCode === "SIGKILL") {
-                console.log("[Polling-sigkill] ffmpeg " + name + " process to Shutdown. (use kill -9 PID) -proc.exitCode=" + proc.exitCode + " -proc.killed=" + proc.killed + " -proc.signalCode=" + proc.signalCode);
+                debug("[Polling-sigkill] ffmpeg " + name + " process to Shutdown. (use kill -9 PID) -proc.exitCode=" + proc.exitCode + " -proc.killed=" + proc.killed + " -proc.signalCode=" + proc.signalCode);
                 logger.instance.debug("[Polling-sigkill] ffmpeg " + name + " process to Shutdown. (use kill -9 PID) -proc.exitCode=" + proc.exitCode + " -proc.killed=" + proc.killed + " -proc.signalCode=" + proc.signalCode);
             }
             else if (parseInt(proc.exitCode) === 0) {
-                    console.log("[Polling-0] ffmpeg " + name + " process to Shutdown. (use kill -9 PID) -proc.exitCode=" + proc.exitCode + " -proc.killed=" + proc.killed + " -proc.signalCode=" + proc.signalCode);
+                    debug("[Polling-0] ffmpeg " + name + " process to Shutdown. (use kill -9 PID) -proc.exitCode=" + proc.exitCode + " -proc.killed=" + proc.killed + " -proc.signalCode=" + proc.signalCode);
                     logger.instance.debug("[Polling-0] ffmpeg " + name + " process to Shutdown. (use kill -9 PID) -proc.exitCode=" + proc.exitCode + " -proc.killed=" + proc.killed + " -proc.signalCode=" + proc.signalCode);
 
             }else {
-                console.log("[Polling-log] ffmpeg " + name + " process to Working." + " -proc.exitCode=" + proc.exitCode + " -proc.killed=" + proc.killed + " -proc.signalCode=" + proc.signalCode);
+                debug("[Polling-log] ffmpeg " + name + " process to Working." + " -proc.exitCode=" + proc.exitCode + " -proc.killed=" + proc.killed + " -proc.signalCode=" + proc.signalCode);
             }
 
         }
@@ -77,7 +77,7 @@ logger.prototype.reachabilityWithHostName = function (name) {
     var nc = exec.exec("nc -vz " + args[0] + " " + args[1], function (err, stdout, stderr) {
        err = err || stderr;
 
-        console.log(new Date(),"to ",name,":",stdout.toString().search("succeeded!"));
+        debug(new Date(),"to ",name,":",stdout.toString().search("succeeded!"));
         logger.instance.debug("reachability:" + stdout);
     });
 };
@@ -90,7 +90,7 @@ logger.prototype.logTotalMemoryUsage = function (PIDs) {
         err = err || stderr;
         if (!err) {
             var args = stdout.toString().split(" ");
-            console.log(new Date(),">> Total Memory %CPU=" + args[0] + ",%MEM=" + args[1] + ",VSZ=" + args[2] + ",RSS=" + args[3]);
+            debug(new Date(),">> Total Memory %CPU=" + args[0] + ",%MEM=" + args[1] + ",VSZ=" + args[2] + ",RSS=" + args[3]);
         }
     });
 };
