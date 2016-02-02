@@ -63,9 +63,6 @@ process.on('message', function(data , handle) {
         }
         keys = null;
     }
-
-
-
         if (data.evt == 'c_equal_division') {
 
             var socket = new net.Socket({

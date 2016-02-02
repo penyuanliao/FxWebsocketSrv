@@ -50,28 +50,29 @@ function createServer(opt) {
     if (typeof opt === 'undefined') {
         opt = {'host':'0.0.0.0', 'port': 8080,'backlog':511};
     };
+
     var srv = new TCP();
     srv.bind(opt.host, cfg.appConfig.port);
     srv.listen(opt.backlog);
-    srv.clusters = [];
+
     srv.onconnection = function (err ,handle) {
 
         if (err) throw new Error("client not connect.");
 
-        //handle.onread = onread_load_balance;
+        handle.onread = onread_load_balance;
+        handle.readStart();
         //onread_equal_division(handle);
-        var worker = clusters.shift();
-        worker.send({'evt':'c_equal_division'}, handle,[{ track: false, process: false }]);
-        clusters.push(worker);
     };
+
     server = srv;
 }
-// srv Equal Division
+/** srv Equal Division **/
 function onread_equal_division(client_handle) {
     var worker = clusters.shift();
     worker.send({'evt':'c_equal_division'}, client_handle,[{ track: false, process: false }]);
     clusters.push(worker);
 };
+/**  **/
 function onread_load_balance(nread, buffer) {
     var handle = this;
     if (nread < 0) return;
@@ -88,22 +89,19 @@ function onread_load_balance(nread, buffer) {
     mode = request_headers.match('websocket') != null  ? "ws"   : mode;
 
     if (mode === 'ws' && isBrowser) {
+
+        var worker = redundancy(httpTag[1]);
+        if (typeof worker === 'undefined') { handle.close(); };
+
+        worker.send({'evt':'c_init',data:request_headers}, handle,[{ track: false, process: false }]);
+
+    }else if(mode === 'http' && isBrowser)
+    {
         var worker = clusters[0];
 
         if (typeof worker === 'undefined') return;
         worker.send({'evt':'c_init',data:request_headers}, handle,[{ track: false, process: false }]);
-
-        //clusters.push(worker);
-
-    }else if(mode === 'http' && isBrowser)
-    {
-        var worker = clusters[1];
-        if (typeof worker === 'undefined') return;
-        worker.send({'evt':'c_init',data:request_headers}, handle,[{ track: false, process: false }]);
     }
-    handle.readStart();
-
-    console.log('mode:', httpTag[1]);
 };
 
 function setupCluster(opt) {
@@ -128,12 +126,33 @@ function setupCluster(opt) {
     };
     /** cluster end - isMaster **/
 }
+/**
+ * 分流處理
+ * @param namespace
+ * @returns {undefined}
+ */
+function redundancy(namespace){
+    var worker = undefined;
+    var maximum = clusters.length-1;
+    var stremNum = cfg.appConfig.fileName.length;
+    var avg = parseInt(maximum / stremNum);
+    var num = 0;
+
+    if (namespace.search('daabb') != -1) worker = clusters[++num];
+    if (namespace.search('daabc') != -1) worker = clusters[++num];
+    if (namespace.search('daabd') != -1) worker = clusters[++num];
+    if (namespace.search('daabg') != -1) worker = clusters[++num];
+    if (namespace.search('daabh') != -1) worker = clusters[++num];
+    if (namespace.search('daabdg') != -1) worker = clusters[++num];
+    if (namespace.search('daabdh') != -1) worker = clusters[++num];
+
+    return worker;
+}
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - //
 // STREAM //
 function createLiveStreams(fileName) {
     var sn = fileName;
-    console.log(":::::",fileName);
     var spawned,_name;
     for (var i = 0; i < sn.length; i++) {
         // schema 2, domain 3, port 5, path 6,last path 7, file 8, querystring 9, hash 12
@@ -170,10 +189,14 @@ function rebootStream(spawned,skip) {
 function swpanedUpdate(base64) {
     var spawnName = this.name;
     //console.log('ffmpeg stream pull the data of a base64');
-    for (var i = 0; i < clusters.length; i++) {
-        clusters[i].send({'evt':'streamData','namespace':spawnName,'data':base64});
+    //for (var i = 1; i < clusters.length; i++) {
+    //    clusters[i].send({'evt':'streamData','namespace':spawnName,'data':base64});
+    //
+    //}
 
-    }
+    var worker = redundancy(spawnName);
+    worker.send({'evt':'streamData','namespace':spawnName,'data':base64});
+
 };
 
 function socketSend(evt, spawnName) {
