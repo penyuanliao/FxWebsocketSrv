@@ -2,21 +2,47 @@
  * Created by Benson.Liao on 16/1/5.
  */
 var config = module.exports = {};
+config.appConfig = appParames();
 config.env = process.env.NODE_ENV;
+/**
+ * host: ip4 - '0.0.0.0', ip6 - '::'
+ *
+ * Backlog: pending connections
+ * **/
+config.numCPUs = require('os').cpus().length;
+
 if (config.env == 'development') {
     config.rtmpHostname = "183.182.79.162";
     config.stream_proc = "ffmpeg";
+    config.srvOptions = {
+        'host': '0.0.0.0',
+        'port': config.appConfig.port,
+        'backlog': 511
+    };
+    config.forkOptions = {
+        'cluster': './FxClusterSrvlb.js',
+        'num': 2
+    };
 }
 else {
     config.rtmpHostname = "192.168.188.72";
     config.stream_proc = "ffmpegv258";
+    config.srvOptions = {
+        'host': '0.0.0.0',
+        'port': config.appConfig.port,
+        'backlog': 511
+    };
+    config.forkOptions = {
+        'cluster': './FxClusterSrvlb.js',
+        'num': config.numCPUs -1
+    };
 }
 config.rtmpPort = 1935;
 config.videoDomainName = config.rtmpHostname + ":" + config.rtmpPort;
-config.numCPUs = require('os').cpus().length;
 
 
-config.appConfig = appParames();
+
+
 
 /**
  * Application parameters
