@@ -3,7 +3,7 @@
  * --always-compact: always full gc().
  * --expose-gc: manual gc().
  */
-const debug = require('debug')('FxClusterlb');
+const debug = require('debug')('FxClusterlb'); //debug
 const fxNetSocket = require('./fxNetSocket');
 const FxConnection = fxNetSocket.netConnection;
 const outputStream = fxNetSocket.stdoutStream;
@@ -173,14 +173,18 @@ function createLiveStreams(fileName) {
 /** 重啟stream **/
 function rebootStream(spawned,skip) {
     if ((spawned.running == false && spawned.STATUS >= 2) || skip == true) {
-        debug('>>rebootStream:', spawned.name);
-        var spawn = liveStreams[spawned.name] = new outputStream( "rtmp://" + cfg.videoDomainName + spawned.name);
+        var streamName = spawned.name.toString();
+        debug('>> rebootStream:', streamName);
+        var spawn = new outputStream( "rtmp://" + cfg.videoDomainName + streamName);
+        liveStreams[streamName] = spawn;
         spawn.idx = spawned.idx;
-        spawn.name = spawned.name;
+        spawn.name = streamName;
         spawn.on('streamData', swpanedUpdate);
         spawn.on('close', swpanedClosed);
         spawned.removeListener('streamData', swpanedUpdate);
         spawned.removeListener('close', swpanedClosed);
+        // shutdown stream release
+        delete spawned;
         spawned = null;
     }
 }

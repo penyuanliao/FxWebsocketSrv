@@ -34,7 +34,7 @@ else {
     };
     config.forkOptions = {
         'cluster': './FxClusterSrvlb.js',
-        'num': config.numCPUs -1
+        'num': 7//config.numCPUs -1
     };
 }
 config.rtmpPort = 1935;
