@@ -9,10 +9,9 @@ var tls = require('tls'), // SSL certificate
 var net = require('net');
 var util = require('util');
 var events = require('events');
+var utility = require('./FxUtility.js');
 
 var fxSocket = require('./FxSocket.js');
-
-var logger = require('./FxLogger.js');
 
 var fxStatus = require('./FxEnum.js').fxStatus;
 
@@ -40,28 +39,31 @@ function FxConnection(port, option){
     this.self = self;
     this.clusters = []; // all child process group
 
-    var app = this.app = net.createServer();
+    if (typeof option === 'undefined') {
+        option = {
+            'runListen':true
+        };
+    };
 
     /* Codes */
+    var app = this.app = net.createServer();
 
     var cb = function () {
         debug('Listening on ' + app.address().port);
 
         self.emit("Listening", app);
 
-
-    }
-
-
-    this.server = this.app.listen(port, cb);
+    };
+    if (option.runListen)
+        this.server = this.app.listen(port, cb);
 
     this.app.on('connection', function(socket) {
 
         var client = new fxSocket(socket);
         // First one, do check connected.
         socket.once('data', function (data) {
-            var mode = findOutSocketConnected(client, data, self);
-            logger.debug("[Connection] Client through Server for mode " + mode);
+            var mode = utility.findOutSocketConnected(client, data, self);
+            debug("[Connection] Client through Server for mode " + mode);
 
             if (mode != fxStatus.http)
             {
@@ -73,8 +75,8 @@ function FxConnection(port, option){
                 //var http = data.toString('utf8');
                 //client.close();
             };
-
         });
+
         /**
          * 確定連線後連線資料事件並傳出data事件
          * @param mode 型態(fxStatus)
@@ -200,66 +202,6 @@ FxConnection.prototype.FxTLSConnection = function (option){
         });
 
     }).listen(8081);
-
-}
-
-var findOutSocketConnected = function (client, chunk, self) {
-    //var socket = this;
-    var request_headers = chunk.toString('utf8');
-    var lines = request_headers.split("\r\n");
-    // [?=\/] 結尾不包含
-    var httpTag = lines[0].toString().match(/^GET (.+)[\/]? HTTP\/\d\.\d$/i);
-    httpTag = (httpTag == null) ? lines[0].toString().match(/^GET (.+) HTTP\/\d\.\d$/i) + "/" : httpTag; // WS protocol namespace endpoint no '/'
-    // FLASH SOCKET \0
-    var unicodeNull = request_headers.match(/\0/g); // check endpoint
-    var swfPolicy = request_headers.match("<policy-file-request/>") == null; // Flash Policy
-    var iswebsocket = request_headers.match('websocket') != null; // Websocket Protocol
-
-    //debug('LOG::Data received: ');
-
-    if (unicodeNull != null && swfPolicy && client.mode != 'ws') {
-        debug('[SOCKET_NET_CONNECTED]:');
-        client.mode = fxStatus.flashSocket;
-
-        self.emit('message', client.read(request_headers));
-
-    }else if (iswebsocket) {
-        debug('[WEBSOCKET_CONNECTED]');
-
-        client.mode = 'ws';
-
-        if (typeof httpTag[0] != "undefined") client.namespace = httpTag[1]; // GET stream namespace
-
-        client.handeshake(chunk);
-        // -- WELCOME TO BENSON WEBSOCKET SOCKET SERVER -- //
-        client.write(JSON.stringify({"NetStatusEvent": "NetConnect.Success"}));
-
-        self.emit('connection', client); //
-
-        return fxStatus.websocket;
-    }
-    else if (client.mode === fxStatus.websocket)
-    {
-        debug('[WEBSOCKET_ROGER]');
-        // check is a websocket framing
-
-        var str = client.read(chunk);
-        var opcode = client.protocol.opcode;
-
-        debug("PROTOCOL::", opcode);
-    }else
-    {
-        debug('[OTHER CONNECTED]');
-
-        if (httpTag.length != 0 && iswebsocket == false)
-        {
-            client.mode = fxStatus.http;
-
-            self.emit("httpUpgrade", request_headers, client, lines);
-
-            return fxStatus.http;
-        }
-    }
 
 };
 
