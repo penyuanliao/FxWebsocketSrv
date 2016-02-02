@@ -11,7 +11,7 @@ SERV_PARAMS="--max-old-space-size=8192 --expose-gc --always-compact"
 
 SERV_FILE="FxLiveStreamSrv.js"
 
-SERV_MULTI_FILE="FxLiveStreamSrv.js"
+SERV_MULTI_FILE="FxLiveMaster.js"
 
 SERV_PORT="80"
 
