@@ -1,7 +1,6 @@
 /**
  * Created by Benson.Liao on 2015/11/17.
  */
-
 var crypto = require("crypto");
 
 const status_code = exports.statusCode = {
@@ -94,6 +93,8 @@ function Headers(){
  */
 
 Headers.prototype.readHeaders = function (chunk) {
+
+    /* Variables */
     var data = chunk.toString('utf8');
     var lines = data.split("\r\n");
     var headers = {};
@@ -101,8 +102,13 @@ Headers.prototype.readHeaders = function (chunk) {
 
     if (lines.length === 1) return false;
 
+    headers["source"] = data;
+    headers["lines"] = lines;
     //Check is GET HTTP 1.1
-    var reqMethod = lines[0].toString().match(/^GET (.+) HTTP\/\d\.\d$/i);
+    var reqMethod = lines[0].toString().match(/^GET (.+)[\/]? HTTP\/\d\.\d$/i); // WS protocol namespace endpoint no '/'
+    // [?=\/] 結尾不包含
+    reqMethod = (reqMethod == null) ? lines[0].toString().match(/^GET (.+) HTTP\/\d\.\d$/i) + "/" : reqMethod;
+    headers['general'] = reqMethod;
 
     if (lines == null) return false;
 
@@ -122,6 +128,23 @@ Headers.prototype.readHeaders = function (chunk) {
         headers[match[1].toLowerCase()] = match[2];
     };
     return headers;
+};
+Headers.prototype.onReadTCPParser = function (chuck) {
+    var request_headers = this.readHeaders(chuck);
+
+    var source = request_headers["source"];
+    // FLASH SOCKET \0
+    var unicodeNull = (typeof source === 'undefined') ? null : source.match(/\0/g); // check endpoint
+
+    var swfPolicy = source.match("<policy-file-request/>") == null; // Flash Policy
+
+    var iswebsocket = (request_headers['upgrade'] === 'websocket'); // Websocket Protocol
+
+    request_headers['unicodeNull'] = unicodeNull; // check endpoint
+    request_headers['swfPolicy'] = swfPolicy; // Flash Policy
+    request_headers['iswebsocket'] = iswebsocket; // Websocket Protocol
+
+    return request_headers;
 };
 /**
  * Websocket connection, the client sends a handshake request, and server return a handshake response.
@@ -186,6 +209,7 @@ Headers.prototype.setStatusCode = function (code) {
 function Protocols()
 {
     this.INT32_MAX_VALUE =  Math.pow(2,32);
+    this.masking_key = new Buffer(4);
 }
 
 Protocols.prototype.readFraming = function (buffer) {
@@ -264,14 +288,17 @@ Protocols.prototype.readFraming = function (buffer) {
     // Proceeds to frame processing
     return protocol;
 };
-
+var _meta = undefined;
 Protocols.prototype.writeFraming = function (fin, opcode, masked, payload) {
     var len, meta, start, mask, i;
 
     len = payload.length;
-
-    // Creates the buffer for meta-data
-    meta = new Buffer(2 + (len < 126 ? 0 : (len < 65536 ? 2 : 8)) + (masked ? 4 : 0));
+    // fix Buffer Reusable
+    if (typeof _meta === 'undefined' || _meta.length < len) {
+        // Creates the buffer for meta-data
+        _meta = new Buffer(2 + (len < 126 ? 0 : (len < 65536 ? 2 : 8)) + (masked ? 4 : 0));
+    }
+    meta = _meta;
 
     // Sets fin and opcode
     meta[0] = (fin ? 128 : 0) + opcode;
@@ -295,7 +322,7 @@ Protocols.prototype.writeFraming = function (fin, opcode, masked, payload) {
 
     // Set the mask-key
     if (masked) {
-        mask = new Buffer(4);
+        mask = this.masking_key;
         for (i = 0; i < 4; i++) {
             meta[start + i] = mask[i] = Math.floor(Math.random() * 256);
         }
