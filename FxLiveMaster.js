@@ -8,10 +8,12 @@ const fxNetSocket = require('./fxNetSocket');
 const FxConnection = fxNetSocket.netConnection;
 const outputStream = fxNetSocket.stdoutStream;
 const parser = fxNetSocket.parser;
+const pheaders = parser.headers;
 const utilities = fxNetSocket.utilities;
 const logger = fxNetSocket.logger;
 /** 建立連線 **/
 const TCP = process.binding("tcp_wrap").TCP;
+const uv = process.binding('uv');
 const fs  = require('fs');
 const net  = require('net');
 const evt = require('events');
@@ -50,58 +52,81 @@ function createServer(opt) {
     if (typeof opt === 'undefined') {
         opt = {'host':'0.0.0.0', 'port': 8080,'backlog':511};
     };
+    var err, tcp_handle;
+    try {
+        tcp_handle = new TCP();
+        err = tcp_handle.bind(opt.host, cfg.appConfig.port);
 
-    var srv = new TCP();
-    srv.bind(opt.host, cfg.appConfig.port);
-    srv.listen(opt.backlog);
+        if (err) {
+            throw new Error(err);
+        };
 
-    srv.onconnection = function (err ,handle) {
+        err = tcp_handle.listen(opt.backlog);
 
-        if (err) throw new Error("client not connect.");
+        if (err) {
+            throw new Error(err);
+        };
 
-        handle.onread = onread_load_balance;
-        handle.readStart();
-        //onread_equal_division(handle);
+        tcp_handle.onconnection = function (err ,handle) {
+
+            if (err) throw new Error("client not connect.");
+
+            handle.onread = onread_url_param;
+            handle.readStart(); //讀header封包
+            //onread_roundrobin(handle);
+        };
+
+        server = tcp_handle;
+    }
+    catch (e) {
+        debug('create server error:', e);
+        tcp_handle.close();
     };
 
-    server = srv;
 }
-/** srv Equal Division **/
-function onread_equal_division(client_handle) {
+/** _handle Equal Division **/
+function onread_roundrobin(client_handle) {
     var worker = clusters.shift();
     worker.send({'evt':'c_equal_division'}, client_handle,[{ track: false, process: false }]);
     clusters.push(worker);
 };
-/**  **/
-function onread_load_balance(nread, buffer) {
+/** reload request header and assign **/
+function onread_url_param(nread, buffer) {
     var handle = this;
+    // nread > 0 read success
     if (nread < 0) return;
 
-    //if (!Buffer.isBuffer(buffer)) buffer = new Buffer(buffer,'utf8');
+    if (nread === 0) {
+        debug('not any data, keep waiting.');
+        return;
+    };
+    // Error, end of file.
+    if (nread === uv.UV_EOF) { debug('error UV_EOF: unexpected end of file.'); return;}
 
-    var request_headers = buffer.toString('utf8');
-    var lines = request_headers.split("\r\n");
-    // [?=\/] 結尾不包含
-    var httpTag = lines[0].toString().match(/^GET (.+)[\/]? HTTP\/\d\.\d$/i);
-    var isBrowser = typeof httpTag != 'undefined';
-    var mode = "net";
-    mode = request_headers.match('HTTP/1.1')  != null  ? "http" : mode;
-    mode = request_headers.match('websocket') != null  ? "ws"   : mode;
+    var headers = pheaders.onReadTCPParser(buffer);
+    var source = headers.source;
+    var general = headers.general;
+    var isBrowser = (typeof general != 'undefined');
+    var mode = "";
+    mode = general[0].match('HTTP/1.1') != null ? "http" : mode;
+    mode = headers.iswebsocket  ? "ws" : mode;
 
     if (mode === 'ws' && isBrowser) {
 
-        var worker = redundancy(httpTag[1]);
+        var worker = assign(general[1]);
         if (typeof worker === 'undefined') { handle.close(); };
 
-        worker.send({'evt':'c_init',data:request_headers}, handle,[{ track: false, process: false }]);
+        worker.send({'evt':'c_init',data:source}, handle,[{ track: false, process: false }]);
 
     }else if(mode === 'http' && isBrowser)
     {
         var worker = clusters[0];
 
         if (typeof worker === 'undefined') return;
-        worker.send({'evt':'c_init',data:request_headers}, handle,[{ track: false, process: false }]);
+        worker.send({'evt':'c_init',data:source}, handle,[{ track: false, process: false }]);
     }
+
+    handle.readStop();
 };
 
 function setupCluster(opt) {
@@ -131,13 +156,43 @@ function setupCluster(opt) {
  * @param namespace
  * @returns {undefined}
  */
-function redundancy(namespace){
+function assign(namespace,cb){
     var worker = undefined;
+
     var maximum = clusters.length-1;
     var stremNum = cfg.appConfig.fileName.length;
     var avg = parseInt(maximum / stremNum);
     var num = 0;
+// url_param
+    cfg.assignRule.asyncEach(function (item, resume) {
+        if (item.constructor === String) {
+            console.log('string:id:', item);
+            if (namespace.search(item) != -1) {
+                if (typeof cb !== 'undefined') {
+                    if (typeof cb !== 'undefined') cb(clusters[num]);
+                    return;
+                }
+            }
+        }
+        if (item.constructor === Array) {
+            var rule,
+                i = 0,
+                cunt = item.length;
+            while (i < cunt) {
+                rule = item[i++];
+                if (namespace.search(rule) != -1) {
+                    if (typeof cb !== 'undefined') cb(clusters[num]);
+                    return;
+                }
+            }
+        }
+        num++;
+        resume();
+    }, function () {
 
+    });
+// roundrobin
+    num = 0;
     if (namespace.search('daabb') != -1) worker = clusters[++num];
     if (namespace.search('daabc') != -1) worker = clusters[++num];
     if (namespace.search('daabd') != -1) worker = clusters[++num];
@@ -145,7 +200,6 @@ function redundancy(namespace){
     if (namespace.search('daabh') != -1) worker = clusters[++num];
     if (namespace.search('daabdg') != -1) worker = clusters[++num];
     if (namespace.search('daabdh') != -1) worker = clusters[++num];
-
     return worker;
 }
 
@@ -198,7 +252,7 @@ function swpanedUpdate(base64) {
     //
     //}
 
-    var worker = redundancy(spawnName);
+    var worker = assign(spawnName);
     worker.send({'evt':'streamData','namespace':spawnName,'data':base64});
 
 };

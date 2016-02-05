@@ -34,9 +34,14 @@ else {
     };
     config.forkOptions = {
         'cluster': './FxClusterSrvlb.js',
-        'num': 7//config.numCPUs -1
+        'num': 8//config.numCPUs -1
     };
 }
+config.assignRule = [['daabb','daabc'], 'daabd','daabg', 'daabh', 'daabdg', 'daabdh'];
+
+//if (config.assignRule.length < config.forkOptions.num) throw new Error("assignRule != forkOptions.num");
+
+
 config.rtmpPort = 1935;
 config.videoDomainName = config.rtmpHostname + ":" + config.rtmpPort;
 

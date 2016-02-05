@@ -9,14 +9,15 @@ var parser = require('./FxParser.js');
  * @param socket : net.socket
  * @constructor
  */
-var FxSocket = function(socket)
+var payload = undefined;
+var FxSocket = function(socket, bufferPool)
 {
     /* Variables */
     this.socket = socket;
     this.isConnect = false;
     socket.name = socket.remoteAddress + "\:" + socket.remotePort;
     this.mode = '';
-
+    payload = (typeof bufferPool !== 'undefined') ? bufferPool : new Buffer(1024 * 32);
 };
 
 var NSLog = function (type, str) {
@@ -107,11 +108,11 @@ function read_websocket(data) {
  *
  * @param data
  */
-var payload = new Buffer(8912);
-function emit_websocket(data) {
 
+function emit_websocket(data) {
     var bfsize = Buffer.byteLength(data);
     if (bfsize > payload.length) {
+        debug("bfsize(%d kb) > payload size(%d kb)", bfsize/ 1024, payload.length/ 1024);
         payload = new Buffer(data);
     }else
     {

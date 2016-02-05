@@ -320,7 +320,7 @@ Protocols.prototype.writeFraming = function (fin, opcode, masked, payload) {
         start += 8;
     }
 
-    // Set the mask-key
+    // Set the mask-key 4 bytes(client only)
     if (masked) {
         mask = this.masking_key;
         for (i = 0; i < 4; i++) {

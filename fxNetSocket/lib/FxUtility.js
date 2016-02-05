@@ -3,6 +3,7 @@
  */
 var logger = require('./FxLogger.js');
 var debug = require('debug')('utility');
+var parser = require('./FxParser.js').headers;
 var fxStatus = require('./FxEnum.js').fxStatus;
 
 function FxUtility() {
@@ -33,18 +34,13 @@ FxUtility.prototype.shutDownAutoGC = function () {
     this.js_auto_gc_enabled = false;
 };
 
-
 FxUtility.prototype.findOutSocketConnected = function (client, chunk, self) {
     //var socket = this;
-    var request_headers = chunk.toString('utf8');
-    var lines = request_headers.split("\r\n");
-    // [?=\/] 結尾不包含
-    var httpTag = lines[0].toString().match(/^GET (.+)[\/]? HTTP\/\d\.\d$/i);
-    httpTag = (httpTag == null) ? lines[0].toString().match(/^GET (.+) HTTP\/\d\.\d$/i) + "/" : httpTag; // WS protocol namespace endpoint no '/'
-    // FLASH SOCKET \0
-    var unicodeNull = request_headers.match(/\0/g); // check endpoint
-    var swfPolicy = request_headers.match("<policy-file-request/>") == null; // Flash Policy
-    var iswebsocket = request_headers.match('websocket') != null; // Websocket Protocol
+    var request_headers = parser.onReadTCPParser(chunk);
+    var unicodeNull = request_headers.unicodeNull;
+    var swfPolicy = request_headers.swfPolicy;
+    var iswebsocket = request_headers.iswebsocket;
+    var general = request_headers.general;
 
     //debug('LOG::Data received: ');
 
@@ -59,7 +55,7 @@ FxUtility.prototype.findOutSocketConnected = function (client, chunk, self) {
 
         client.mode = 'ws';
 
-        if (typeof httpTag[0] != "undefined") client.namespace = httpTag[1]; // GET stream namespace
+        if (typeof general[0] != "undefined") client.namespace = general[1]; // GET stream namespace
 
         client.handeshake(chunk);
         // -- WELCOME TO BENSON WEBSOCKET SOCKET SERVER -- //
@@ -82,11 +78,11 @@ FxUtility.prototype.findOutSocketConnected = function (client, chunk, self) {
     {
         debug('[OTHER CONNECTED]');
 
-        if (httpTag.length != 0 && iswebsocket == false)
+        if (request_headers.general.length != 0 && iswebsocket == false)
         {
             client.mode = fxStatus.http;
 
-            if (typeof self != undefined && self != null) self.emit("httpUpgrade", request_headers, client, lines);
+            if (typeof self != undefined && self != null) self.emit("httpUpgrade", request_headers, client, request_headers.lines);
 
             return fxStatus.http;
         }
