@@ -20,8 +20,10 @@ if (config.env == 'development') {
         'backlog': 511
     };
     config.forkOptions = {
+        'webCluster':'',
+        'webNum':0,
         'cluster': './FxClusterSrvlb.js',
-        'num': 2
+        'clusterNum': 2,
     };
 }
 else {
@@ -33,8 +35,10 @@ else {
         'backlog': 511
     };
     config.forkOptions = {
+        'webCluster':'',
+        'webNum':0,
         'cluster': './FxClusterSrvlb.js',
-        'num': 8//config.numCPUs -1
+        'clusterNum': 8//config.numCPUs -1
     };
 }
 config.assignRule = [['daabb','daabc'], 'daabd','daabg', 'daabh', 'daabdg', 'daabdh'];
@@ -44,8 +48,8 @@ config.assignRule = [['daabb','daabc'], 'daabd','daabg', 'daabh', 'daabdg', 'daa
 
 config.rtmpPort = 1935;
 config.videoDomainName = config.rtmpHostname + ":" + config.rtmpPort;
-
-
+//todo define the balance
+config.balance = 'url_param';//roundrobin
 
 
 

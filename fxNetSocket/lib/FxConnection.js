@@ -96,7 +96,7 @@ function FxConnection(port, option){
                     }
                 }
 
-                self.emit("message", data);
+                self.emit("message", {'client':client,'data':data});
             });
 
         };

@@ -16,13 +16,10 @@ var evt = require('events');
 var cfg = require('./config.js');
 /** 所有視訊stream物件 **/
 var liveStreams = {};
-//const videoDomainName = "183.182.79.162:1935";
-
-
 /** createLiveStreams **/
 createLiveStreams(cfg.appConfig.fileName);
-setInterval(observerTotoalUseMem,60000); // testing code 1.0 min
-utilities.autoReleaseGC(); //** 手動 1 sec gc
+setInterval(observerTotoalUseMem,60*60*1000); // testing code 60.0 min
+utilities.autoReleaseGC(); //** 手動 10 sec gc
 var srv = new FxConnection(cfg.appConfig.port);
 srv.on('connection', function (socket) {
     debug('clients:',socket.name);
@@ -52,8 +49,8 @@ srv.on('connection', function (socket) {
     }
 });
 /** socket data event **/
-srv.on('message', function (data) {
-    debug('message :',data);
+srv.on('message', function (evt) {
+    debug('message :',evt.data);
 });
 /** client socket destroy **/
 srv.on('disconnect', function (socket) {
@@ -196,8 +193,12 @@ function swpanedUpdate(base64) {
     var spawnName = this.name;
     var clients = srv.getClients();
     var keys = Object.keys(clients);
-    if (keys.length == 0) return;
-
+    if (keys.length == 0) {
+        keys = null;
+        clients = null;
+        return;
+    }
+    debug('keys:',keys.length);
     for (var i = 0 ; i < keys.length; i++) {
         var socket = clients[keys[i]];
         if (socket.isConnect == true) {
@@ -206,6 +207,7 @@ function swpanedUpdate(base64) {
         }
     }
     keys = null;
+    clients = null;
 }
 
 function socketSend(evt, spawnName) {

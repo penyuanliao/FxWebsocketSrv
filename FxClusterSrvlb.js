@@ -195,8 +195,19 @@ function setupCluster(srv) {
         debug('clients:',socket.name);
     });
     /** socket data event **/
-    srv.on('message', function (data) {
-        debug('message :',data);
+    srv.on('message', function (evt) {
+        debug('message :',evt.data);
+
+        try {
+
+            var json = JSON.parse(evt.data);
+            if (json.NetStreamEvent === 'getConnections') {
+                srv.getConnections(function (err, count) {
+                    evt.client.write(JSON.stringify({"NetStreamEvent":"getConnections","data":count}));
+                });
+            }
+        }
+        catch (e) { };
     });
     /** client socket destroy **/
     srv.on('disconnect', function (socket) {
@@ -236,16 +247,36 @@ function setupCluster(srv) {
                 //client.close();
             });
         }
-        else if (_get[1] === "/favicon.ico") {
-            failureHeader(404, socket, "ico");
-            socket.end();
+        else if (_get[1].indexOf('.html') != -1) {
+            fs.readFile("./public" + _get[1], function (err, data) {
+                successfulHeader(200, socket, "html");
+                socket.write(data);
+                socket.end();
+                //client.close();
+            });
+        }
+        else if  (_get[1].indexOf('.png') != -1) {
+            var stat = fs.statSync("./public" + _get[1]);
+
+
+            socket.setEncoding('binary');
+
+            var fileWriteStream1 = fs.createReadStream("./public" + _get[1]);
+            fileWriteStream1.pipe(socket);
+            //successfulHeader(200, socket, { 'Content-Type' : 'image/png'});
         }
         else
         {
-            successfulHeader(200, socket, "js");
+             if (_get[1] === "/favicon.ico") {
+                successfulHeader(200, socket, "image/x-icon");
+            }else {
+                successfulHeader(200, socket, "js");
+            }
+
             var fsstream = fs.createReadStream("./public" + _get[1], {bufferSize: 1024 * 300, end:false});
             var fileLength = 0;
             fsstream.on('open', function () {
+
                 fsstream.pipe(socket);
             });
             console.log('client:',typeof socket === 'undefined' , _get[1]);
@@ -274,8 +305,24 @@ function setupCluster(srv) {
      * @param type: content-type
      * */
     function successfulHeader(code, socket, type) {
+        var contentType = "text/html";
+        var contentLength = 0;
+        if (type.constructor === Object) {
+            contentType = type['Content-Type'];
+            //contentLength = type['Content-Length'];
+        }else{
+            if (type === 'js') {
+                contentType = "application/javascript";
+            }else if (type === 'jpeg') {
+                contentType = 'image/jpg';
+            }else if (type === 'html') {
+                contentType = "text/html";
+            }else {
+                contentType = type;
+            }
+        }
 
-        var contentType = type === 'js' ? "application/javascript" : "text/html";
+
 
         var headers = parser.headers.responseHeader(code, {
             "Host": srv.app.address().address,
@@ -287,7 +334,7 @@ function setupCluster(srv) {
         });
 
         //socket.write("Content-Security-Policy: default-src 'self'; img-src *;object-src 'self' http://127.0.0.1; script-src 'self' http://127.0.0.1;\n");
-        socket.write(headers);
+        if (socket != null && typeof socket != 'undefined') socket.write(headers);
     };
     /**
      * @param code: response header Status Code

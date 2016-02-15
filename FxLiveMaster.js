@@ -73,7 +73,7 @@ function createServer(opt) {
 
             handle.onread = onread_url_param;
             handle.readStart(); //讀header封包
-            //onread_roundrobin(handle);
+            //onread_roundrobin(handle); //平均分配資源
         };
 
         server = tcp_handle;
@@ -131,12 +131,12 @@ function onread_url_param(nread, buffer) {
 
 function setupCluster(opt) {
     if (typeof opt === 'undefined') {
-        opt = { 'cluster': '', 'num': 0 };
+        opt = { 'cluster': '', 'clusterNum': 0 };
     }
 
     /** cluster start - isMaster **/
 
-    var num = Number(opt.num);
+    var num = Number(opt.clusterNum);
 
     if (isMaster && num != 0) { // isMaster
         for (var i = 0; i < num; i++) {
