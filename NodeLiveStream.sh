@@ -25,7 +25,7 @@ fi
 #
 #SERV_PORT="3000"
 
-SERV_PATH="rtmp://183.182.79.162:1935/video/daabb/video0/ rtmp://183.182.79.162:1935/video/daabc/video0/"
+#SERV_PATH="rtmp://183.182.79.162:1935/video/daabb/video0/ rtmp://183.182.79.162:1935/video/daabc/video0/"
 echo "args:" + node ${SERV_PARAMS} ${SERV_MULTI_FILE} -p ${SERV_PORT} -f "$SERV_PATH"
 
 # exec node ${SERV_PARAMS} ${SERV_MULTI_FILE} -p ${SERV_PORT} -f "rtmp://192.168.188.72/video/daabb/video0/ rtmp://192.168.188.72/video/daabc/video0/ rtmp://192.168.188.72/video/daabd/video0/ rtmp://192.168.188.72/video/daabg/video0/ rtmp://192.168.188.72/video/daabh/video0/ rtmp://192.168.188.72/video/daabdg/video0/ rtmp://192.168.188.72/video/daabdh/video0/" > app.log 2>&1 &
