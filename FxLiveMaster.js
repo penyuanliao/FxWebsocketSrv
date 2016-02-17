@@ -22,7 +22,6 @@ const proc = require('child_process');
 /** 所有視訊stream物件 **/
 var liveStreams = {};
 /** 多執行緒 **/
-var cluster = require('cluster');
 var isWorker = ('NODE_CDID' in process.env);
 var isMaster = (isWorker === false);
 var server;
@@ -113,10 +112,15 @@ function onread_url_param(nread, buffer) {
 
     if (mode === 'ws' && isBrowser) {
 
-        var worker = assign(general[1]);
-        if (typeof worker === 'undefined') { handle.close(); };
+        assign(general[1], function (worker) {
 
-        worker.send({'evt':'c_init',data:source}, handle,[{ track: false, process: false }]);
+            if (typeof worker === 'undefined') {
+                handle.close();
+            }else{
+                worker.send({'evt':'c_init',data:source}, handle,[{ track: false, process: false }]);
+            };
+
+        });
 
     }else if(mode === 'http' && isBrowser)
     {
@@ -181,43 +185,47 @@ function assign(namespace,cb){
     var avg = parseInt(maximum / stremNum);
     var num = 0;
 // url_param
-    cfg.assignRule.asyncEach(function (item, resume) {
-        if (item.constructor === String) {
-            console.log('string:id:', item);
-            if (namespace.search(item) != -1) {
-                if (typeof cb !== 'undefined') {
-                    if (typeof cb !== 'undefined') cb(clusters[num]);
-                    return;
+    if (cfg.balance === "url_param") {
+        cfg.assignRule.asyncEach(function (item, resume) {
+            if (item.constructor === String) {
+                console.log('string:id:', item);
+                if (namespace.search(item) != -1) {
+                    if (typeof cb !== 'undefined') {
+                        if (cb) cb(clusters[num]);
+                        return;
+                    }
                 }
             }
-        }
-        if (item.constructor === Array) {
-            var rule,
-                i = 0,
-                cunt = item.length;
-            while (i < cunt) {
-                rule = item[i++];
-                if (namespace.search(rule) != -1) {
-                    if (typeof cb !== 'undefined') cb(clusters[num]);
-                    return;
+            if (item.constructor === Array) {
+                var rule,
+                    i = 0,
+                    cunt = item.length;
+                while (i < cunt) {
+                    rule = item[i++];
+                    if (namespace.search(rule) != -1) {
+                        if (cb) cb(clusters[num]);
+                        return;
+                    }
                 }
             }
-        }
-        num++;
-        resume();
-    }, function () {
-
-    });
-// roundrobin
-    num = 0;
-    if (namespace.search('daabb') != -1) worker = clusters[++num];
-    if (namespace.search('daabc') != -1) worker = clusters[++num];
-    if (namespace.search('daabd') != -1) worker = clusters[++num];
-    if (namespace.search('daabg') != -1) worker = clusters[++num];
-    if (namespace.search('daabh') != -1) worker = clusters[++num];
-    if (namespace.search('daabdg') != -1) worker = clusters[++num];
-    if (namespace.search('daabdh') != -1) worker = clusters[++num];
-    return worker;
+            num++;
+            resume();
+        }, function () {
+            debug('ERROR::not found Worker Server:', namespace);
+            if (cb) cb(undefined);
+        });
+    }
+    else if (cfg.balance === "roundrobin") {
+        num = 0;
+        if (namespace.search('daabb') != -1) worker = clusters[++num];
+        if (namespace.search('daabc') != -1) worker = clusters[++num];
+        if (namespace.search('daabd') != -1) worker = clusters[++num];
+        if (namespace.search('daabg') != -1) worker = clusters[++num];
+        if (namespace.search('daabh') != -1) worker = clusters[++num];
+        if (namespace.search('daabdg') != -1) worker = clusters[++num];
+        if (namespace.search('daabdh') != -1) worker = clusters[++num];
+        if (cb) cb(worker);
+    }
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - //
@@ -269,8 +277,12 @@ function swpanedUpdate(base64) {
     //
     //}
 
-    var worker = assign(spawnName);
-    worker.send({'evt':'streamData','namespace':spawnName,'data':base64});
+    assign(spawnName, function (worker) {
+        if (worker) {
+            worker.send({'evt':'streamData','namespace':spawnName,'data':base64});
+        }
+    });
+
 
 };
 
