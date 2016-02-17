@@ -68,7 +68,7 @@ function FxConnection(port, option){
             if (mode != fxStatus.http)
             {
                 client.isConnect = true;
-                addUpdateData(mode);
+                addUpdateData(mode, client);
                 // debug("[INFO] Add client mode:",client.mode);
                 clients[client.name] = client; //TODO 二維分組namespace物件
             } else {
@@ -80,8 +80,9 @@ function FxConnection(port, option){
         /**
          * 確定連線後連線資料事件並傳出data事件
          * @param mode 型態(fxStatus)
+         * @param client 來源socket
          */
-        function addUpdateData(mode) {
+        function addUpdateData(mode, client) {
 
             socket.on('data', function (chunk) {
 
@@ -205,18 +206,11 @@ FxConnection.prototype.FxTLSConnection = function (option){
 
 };
 
-/***
- * 計算使用者數量
- * @returns {*}
+/**
+ *
+ * @param namespace
+ * @returns {Array}
  */
-FxConnection.prototype.clientsCount = function () {
-    if (clients === null) return 0;
-
-    var keys = Object.keys(clients);
-
-    return keys.length;
-};
-
 FxConnection.prototype.getClients = function (namespace) {
     if (typeof namespace === 'undefined' || namespace == null ) return clients;
 
@@ -233,6 +227,18 @@ FxConnection.prototype.getClients = function (namespace) {
     }
     return groups;
 
+};
+/**
+ * 計算使用者數量
+ * @param namespace
+ * @returns {*}
+ */
+FxConnection.prototype.getConnections = function (namespace) {
+    if (clients === null) return 0;
+    if (typeof namespace === 'undefined' || namespace == null ) return Object.keys(clients).length;
+    var keys = Object.keys(clients);
+
+    return this.getClients(namespace).length;
 };
 
 module.exports = FxConnection;

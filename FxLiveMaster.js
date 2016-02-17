@@ -146,6 +146,23 @@ function setupCluster(opt) {
             env.NODE_CDID = i;
             var cluster = proc.fork(opt.cluster,{silent:false}, {env:env});
             cluster.name = 'ch_' + i;
+            cluster.on('disconnect', function (code) {
+                console.log('disconnect');
+            });
+            cluster.on('close', function (code) {
+                console.log('close');
+                var index = clusters.indexOf(cluster);
+                if (index > -1) clusters.splice(index, 1);
+            });
+            cluster.on('exit', function (code) {
+                console.log('exit');
+            });
+            cluster.on('SIGQUIT', function (code) {
+                console.log('SIGQUIT');
+            });
+            //cluster.on('error', function (err) {
+            //    console.log('error',err);
+            //});
             clusters.push(cluster);
         };
     };

@@ -26,7 +26,6 @@ var server;
 var sockets = [];
 var _handle = undefined;
 
-
 var self = this;
 
 var srv = new FxConnection();
@@ -53,10 +52,11 @@ process.on('message', function(data , handle) {
             var socket = clients[keys[i]];
             if (socket.isConnect == true) {
                 if (socket.namespace == spawnName) {
-                    var str = JSON.stringify({"NetStreamEvent": "NetStreamData", 'data': json.data});
-                    //debug('INFO::::%s bytes', Buffer.byteLength(str));
-                    //!!!! cpu very busy !!!
-                    socket.write(str);
+                        var str = JSON.stringify({"NetStreamEvent": "NetStreamData", 'data': json.data});
+                        //debug('INFO::::%s bytes', Buffer.byteLength(str));
+                        //!!!! cpu very busy !!!
+                        socket.write(str);
+
                 }
 
             }
@@ -76,8 +76,8 @@ process.on('message', function(data , handle) {
             socket.emit("connect");
 
             return;
-        }
-        if (data.evt == 'c_init') {
+        };
+        if (data.evt == 'c_init' || data.evt == 'sendHandle') {
 
             var socket = new net.Socket({
                 handle:handle,
@@ -90,7 +90,12 @@ process.on('message', function(data , handle) {
             socket.emit("connect");
             socket.emit('data',new Buffer(data.data));
             return;
+        };
+        if (data.evt == 'processInfo') {
+            console.log('child receive msg:%d', data);
+            process.send({"evt":"processInfo", "data": ""});
         }
+
         if (data == 'c_socket') {
 
             console.log("maxConnections:",server.maxConnections);
@@ -120,50 +125,6 @@ process.on('message', function(data , handle) {
             return;
         }
 });
-/*
-function createLiveStreams(fileName) {
-    var sn = ['rtmp://183.182.79.162:1935/video/daabb/video0/'];
-    var spawned,_name;
-    for (var i = 0; i < sn.length; i++) {
-        // schema 2, domain 3, port 5, path 6,last path 7, file 8, querystring 9, hash 12
-        _name = sn[i].toString().match(/^((rtmp[s]?):\/)?\/?([^:\/\s]+)(:([^\/]*))?((\/\w+)*\/)([\w\-\.]+[^#?\s]+)(\?([^#]*))?(#(.*))?$/i);
-        if (typeof  _name[6] != 'undefined' && typeof _name[8] != 'undefined') {
-            var pathname = _name[6] + _name[8];
-            spawned = liveStreams[pathname] = new outputStream(sn[i]);
-            spawned.name = pathname;
-            spawned.on('streamData', swpanedUpdate);
-            //spawned.on('close', swpanedClosed);
-            spawned = null;
-        }else {
-            throw "create Live Stream path error." + sn[i];
-        }
-
-    };
-};
-
-function swpanedUpdate(base64) {
-
-    var spawnName = this.name;
-    var clients = server.getClients();
-    var keys = Object.keys(clients);
-    if (keys.length == 0) {
-        keys = null;
-        clients = null;
-        return;
-    }
-    debug('keys:',keys.length);
-    for (var i = 0 ; i < keys.length; i++) {
-        var socket = clients[keys[i]];
-        if (socket.isConnect == true) {
-            if (socket.namespace === spawnName)
-                socket.write(JSON.stringify({"NetStreamEvent":"NetStreamData",data:base64}));
-        }
-    }
-    keys = null;
-    clients = null;
-}
-*/
-
 
 if (isMaster) initizatialSrv();
 
@@ -179,8 +140,6 @@ function initizatialSrv() {
     var srv = new FxConnection(cfg.appConfig.port,{'cluster':4});
     setupCluster(srv);
     server = srv;
-
-
 
     isMaster = false;
 }
@@ -199,12 +158,12 @@ function setupCluster(srv) {
         debug('message :',evt.data);
 
         try {
-
             var json = JSON.parse(evt.data);
+
+            console.log(json.NetStreamEvent === 'getConnections');
+
             if (json.NetStreamEvent === 'getConnections') {
-                srv.getConnections(function (err, count) {
-                    evt.client.write(JSON.stringify({"NetStreamEvent":"getConnections","data":count}));
-                });
+                evt.client.write(JSON.stringify({"NetStreamEvent":"getConnections","data":srv.getConnections()}));
             }
         }
         catch (e) { };

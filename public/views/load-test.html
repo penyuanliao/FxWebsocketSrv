@@ -129,26 +129,17 @@
         function onOpenHandle(evt){
             console.log('websocket on connected.');
             ws.send("hi server");
-            ws.send(JSON.stringify({"NetStreamEvent":"getConnections"}));
         };
         function onMessageHandle(evt) {
 //            console.log('data connected.',evt);
             var json = JSON.parse(evt.data);
 
             if (json.NetStreamEvent === "NetStreamData") {
-
-                var vList = String(json.data).split(',');
-                console.log("vList:",vList.length);
-                for (var i = 0; i < vList.length; i++) {
-                    var bin = toUint8Array(vList[i]);
-                    player.decode(bin);
+                var bin = toUint8Array(json.data);
+                player.decode(bin);
 //                decode.decode(bin);
-                    connecttd();
-                    startTime();
-
-                }
-
-
+                connecttd();
+                startTime();
             }
 
         };
