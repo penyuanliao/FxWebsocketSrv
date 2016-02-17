@@ -60,7 +60,7 @@ function FxOutdevs(fileName) {
 
         this.ffmpeg = spawn("ffmpeg", params);
 
-        checkProccess(this.ffmpeg);
+        //checkProccess(this.ffmpeg); //
 
         this.streamDelegate = this.ffmpeg.stdout;
 

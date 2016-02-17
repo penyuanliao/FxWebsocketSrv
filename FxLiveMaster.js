@@ -5,7 +5,6 @@
  */
 const debug = require('debug')('FxClusterlb'); //debug
 const fxNetSocket = require('./fxNetSocket');
-const FxConnection = fxNetSocket.netConnection;
 const outputStream = fxNetSocket.stdoutStream;
 const parser = fxNetSocket.parser;
 const pheaders = parser.headers;
@@ -33,7 +32,7 @@ if (isMaster) initizatialSrv();
 function initizatialSrv() {
     /** createLiveStreams **/
     createLiveStreams(cfg.appConfig.fileName);
-    setInterval(observerTotoalUseMem, 60000); // testing code 1.0 min
+    //setInterval(observerTotoalUseMem, 60000); // testing code 1.0 min
 
     utilities.autoReleaseGC(); //** 手動 1 sec gc
 
@@ -307,10 +306,8 @@ function swpanedClosed(code){
     //** 監聽到自動關閉,重新啟動 code == 0 **/
     if (1) {
         debug("listen swpaned Closed - ",this.name, " < REBOOTING >");
-        rebootStream(this,true);
+        setTimeout(function () { rebootStream(this,true) }, 1000);
     }
-
-    logger.reachabilityWithHostName(cfg.videoDomainName);
 
 };
 /** 觀察記憶體使用狀況 **/
