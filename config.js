@@ -28,7 +28,7 @@ if (config.env == 'development') {
 }
 else {
     config.rtmpHostname = "192.168.188.72";
-    config.stream_proc = "ffmpegv258";
+    config.stream_proc = "ffmpeg";
     config.srvOptions = {
         'host': '0.0.0.0',
         'port': config.appConfig.port,
@@ -38,7 +38,7 @@ else {
         'webCluster':'',
         'webNum':0,
         'cluster': './FxClusterSrvlb.js',
-        'clusterNum': 8//config.numCPUs -1
+        'clusterNum': 2//config.numCPUs -1
     };
 }
 config.assignRule = [['daabb','daabc'], 'daabd','daabg', 'daabh', 'daabdg', 'daabdh'];
