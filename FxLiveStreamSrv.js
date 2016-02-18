@@ -157,7 +157,9 @@ function failureHeader(code, socket) {
 function createLiveStreams(fileName) {
     var sn = fileName;
     var spawned,_name;
-    for (var i = 0; i < sn.length; i++) {
+    var max = sn.length-1;
+    var i = 0;
+    var si = setInterval(function () {
         // schema 2, domain 3, port 5, path 6,last path 7, file 8, querystring 9, hash 12
         _name = sn[i].toString().match(/^((rtmp[s]?):\/)?\/?([^:\/\s]+)(:([^\/]*))?((\/\w+)*\/)([\w\-\.]+[^#?\s]+)(\?([^#]*))?(#(.*))?$/i);
         if (typeof  _name[6] != 'undefined' && typeof _name[8] != 'undefined') {
@@ -170,8 +172,9 @@ function createLiveStreams(fileName) {
         }else {
             throw "create Live Stream path error." + sn[i];
         }
-
-    };
+        i++;
+        if (i == max) si = clearInterval(si);
+    }, 100);
 
 
 };
