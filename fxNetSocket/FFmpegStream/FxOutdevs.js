@@ -31,20 +31,35 @@ var logger = require('../lib/FxLogger.js');
 
 util.inherits(FxOutdevs, events.EventEmitter);
 
-function FxOutdevs(fileName) {
+function FxOutdevs(fileName, procfile) {
 
     /*** Arguments ***/
     _fileName = fileName;
 
     this.running = false;
 
+    this.ffmpeg = null;
+
+    this.ffmpeg_pid = 0;
+
     this.STATUS = stdoutStatus.INIT;
 
+    if (!procfile) {
+        this._procfile = 'ffmpeg';
+    }
+
     /*** Initialize ***/
+
+    events.EventEmitter.call(this);
+
+    this.init();
+
+}
+
+FxOutdevs.prototype.init = function () {
     try {
         var self = this;
-        //"-loglevel", "quiet",
-        events.EventEmitter.call(this);
+        self.running = true;
         //
         //var params = ["-y", "-re",
         //    "-i", _fileName,
@@ -58,8 +73,8 @@ function FxOutdevs(fileName) {
         var fmParams = " " + (params.toString()).replace(/[,]/g, " ");
         debug("ffmpeg " + fmParams);
 
-        this.ffmpeg = spawn("ffmpeg", params);
-
+        this.ffmpeg = spawn(self._procfile, params);
+        this.ffmpeg_pid = this.ffmpeg.pid;
         //checkProccess(this.ffmpeg); //
 
         this.streamDelegate = this.ffmpeg.stdout;
@@ -109,12 +124,22 @@ function FxOutdevs(fileName) {
             self.running = false;
             self.STATUS = stdoutStatus.CLOSE;
             self.emit('close', code);
+            //remove event
+            self.streamDelegate.removeListener("data", streamDataHandler);
+            self.ffmpeg.stderr.removeListener("data", stderrDataHanlder);
+            self.ffmpeg.removeListener("close", stdoutCloseHandler);
+            self.ffmpeg.removeListener("exit",stdoutExitHandler);
+            self.streamDelegate.removeListener("readable", readableHandler);
+            self.streamDelegate.removeListener("error", streamErrorHandler);
+            self.release();
         };
         var stdoutExitHandler = function() {
             debug('[Debug] Hasta la vista, baby!');
             self.running = false;
             self.emit('exit');
             logger.debug("[Exit] Exit_event - Child process exited ");
+
+
         };
         var readableHandler = function () {
             debug('[Debug] readable first stream in here.');
@@ -128,18 +153,14 @@ function FxOutdevs(fileName) {
             self.STATUS = stdoutStatus.ERROR;
             self.emit('error');
         };
-        
+
         this.streamDelegate.on("data", streamDataHandler); // Standard Output 標準輸出串流(輸出cli視窗)
         /* 接收事件 不建立這個事件會卡住...雷 */
         this.ffmpeg.stderr.on("data", stderrDataHanlder); // Standard Error 標準錯誤輸出串流(輸出cli視窗)
 
         this.ffmpeg.on("close", stdoutCloseHandler); //
-        
-        this.ffmpeg.on("exit",stdoutExitHandler); //
 
-        this.ffmpeg.on('disconnect', function() {
-            debug('Worker has disconnected');
-        });
+        this.ffmpeg.on("exit",stdoutExitHandler); //
 
         this.streamDelegate.on("readable", readableHandler);
 
@@ -150,13 +171,33 @@ function FxOutdevs(fileName) {
         debug('[ERROR]createServer::', e);
         logger.debug("FxOutdevs Exception ERRORS: " + e);
     }
+};
 
-}
+FxOutdevs.prototype.quit = function () {
+    if (this.ffmpeg) {
+        debug('ffmpeg maybe termination.');
+        this.running = false;
+        cp.exec("kill -9 " + this.ffmpeg_pid);
+
+        this.release();
+
+    }
+};
+FxOutdevs.prototype.release = function () {
+    this.ffmpeg = null;
+    this.ffmpeg_pid = 0;
+    this.streamDelegate = null;
+};
+
 /** destroy ffmpeg stream **/
 FxOutdevs.prototype.disconnect = function () {
 
-    if (this.ffmpeg != null && typeof this.ffmpeg != 'undefined')
+    if (this.ffmpeg != null && typeof this.ffmpeg != 'undefined') {
+        this.ffmpeg.disconnect();
         this.ffmpeg.kill('SIGINT');
+        this.ffmpeg = null;
+    }
+
 };
 /** ffmpeg command line then pipe the STDOUT stream to the NodJS. The data to encode BASE64 string then send it.  **/
 FxOutdevs.prototype.streamByReadBase64 = function (callback) {
@@ -167,7 +208,7 @@ FxOutdevs.prototype.streamPipe = function (dest) {
   this.ffmpeg.pipe(dest);
 };
 
-/** 定期紀錄child process 狀態 **/
+/** 定期紀錄child process 狀態 太多會busy **/
 function checkProccess(proc) {
     logger.debug("[Debug] Child process ffmpeg '" + _fileName + "' start.");
     logger.pollingWithProcess(proc,_fileName, 60000); // 1 min

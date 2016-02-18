@@ -231,8 +231,10 @@ function assign(namespace,cb){
 // STREAM //
 function createLiveStreams(fileName) {
     var sn = fileName;
-    var spawned,_name;
-    for (var i = 0; i < sn.length; i++) {
+    var length = sn.length;
+    var spawned, _name, i;
+
+    for (i = 0; i < length; i++) {
         // schema 2, domain 3, port 5, path 6,last path 7, file 8, querystring 9, hash 12
         _name = sn[i].toString().match(/^((rtmp[s]?):\/)?\/?([^:\/\s]+)(:([^\/]*))?((\/\w+)*\/)([\w\-\.]+[^#?\s]+)(\?([^#]*))?(#(.*))?$/i);
         if (typeof  _name[6] != 'undefined' && typeof _name[8] != 'undefined') {
@@ -253,18 +255,8 @@ function rebootStream(spawned,skip) {
     if ((spawned.running == false && spawned.STATUS >= 2) || skip == true) {
         var streamName = spawned.name.toString();
         debug('>> rebootStream:', streamName);
-        var spawn = new outputStream( "rtmp://" + cfg.videoDomainName + streamName);
-        liveStreams[streamName] = spawn;
-        spawn.idx = spawned.idx;
-        spawn.name = streamName;
-        spawn.on('streamData', swpanedUpdate);
-        spawn.on('close', swpanedClosed);
-        spawned.removeListener('streamData', swpanedUpdate);
-        spawned.removeListener('close', swpanedClosed);
-        // shutdown stream release
-        delete spawned;
-        spawned = null;
-    }
+        liveStreams[streamName].init();
+    };
 }
 /** ffmpeg stream pull the data of a base64 **/
 
@@ -306,7 +298,7 @@ function swpanedClosed(code){
     //** 監聽到自動關閉,重新啟動 code == 0 **/
     if (1) {
         debug("listen swpaned Closed - ",this.name, " < REBOOTING >");
-        setTimeout(function () { rebootStream(this,true) }, 1000);
+        rebootStream(this,true);
     }
 
 };
