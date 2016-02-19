@@ -10,6 +10,7 @@ const parser = fxNetSocket.parser;
 const pheaders = parser.headers;
 const utilities = fxNetSocket.utilities;
 const logger = fxNetSocket.logger;
+const daemon = fxNetSocket.daemon;
 /** 建立連線 **/
 const TCP = process.binding("tcp_wrap").TCP;
 const uv = process.binding('uv');
@@ -47,7 +48,7 @@ function initizatialSrv() {
  * @param opt
  */
 function createServer(opt) {
-    if (typeof opt === 'undefined') {
+    if (!opt) {
         opt = {'host':'0.0.0.0', 'port': 8080,'backlog':511};
     };
     var err, tcp_handle;
@@ -116,6 +117,7 @@ function onread_url_param(nread, buffer) {
             if (typeof worker === 'undefined') {
                 handle.close();
             }else{
+
                 worker.send({'evt':'c_init',data:source}, handle,[{ track: false, process: false }]);
             };
 
@@ -147,25 +149,10 @@ function setupCluster(opt) {
             // file , fork.settings, args
             var env = process.env;
             env.NODE_CDID = i;
-            var cluster = proc.fork(opt.cluster,{silent:false}, {env:env});
+            //var cluster = proc.fork(opt.cluster,{silent:false}, {env:env});
+            var cluster = new daemon(opt.cluster,{silent:false}, {env:env});
+            cluster.init();
             cluster.name = 'ch_' + i;
-            cluster.on('disconnect', function (code) {
-                console.log('disconnect');
-            });
-            cluster.on('close', function (code) {
-                console.log('close');
-                var index = clusters.indexOf(cluster);
-                if (index > -1) clusters.splice(index, 1);
-            });
-            cluster.on('exit', function (code) {
-                console.log('exit');
-            });
-            cluster.on('SIGQUIT', function (code) {
-                console.log('SIGQUIT');
-            });
-            //cluster.on('error', function (err) {
-            //    console.log('error',err);
-            //});
             clusters.push(cluster);
         };
     };
@@ -176,7 +163,7 @@ function setupCluster(opt) {
  * @param namespace
  * @returns {undefined}
  */
-function assign(namespace,cb){
+function assign(namespace,cb) {
     var worker = undefined;
 
     var maximum = clusters.length-1;
@@ -262,11 +249,6 @@ function rebootStream(spawned,skip) {
 
 function swpanedUpdate(base64) {
     var spawnName = this.name;
-    //console.log('ffmpeg stream pull the data of a base64');
-    //for (var i = 1; i < clusters.length; i++) {
-    //    clusters[i].send({'evt':'streamData','namespace':spawnName,'data':base64});
-    //
-    //}
 
     assign(spawnName, function (worker) {
         if (worker) {
@@ -274,14 +256,13 @@ function swpanedUpdate(base64) {
         }
     });
 
-
 };
 
-function socketSend(evt, spawnName) {
+function socketSend(handle, spawnName) {
 
     for (var i = 0; i < clusters.length; i++) {
         if (clusters[i]) {
-            clusters[i].send({'handle':'socketSend','evt':evt,'spawnName':spawnName});
+            clusters[i].send({'handle':handle,'evt':'socketSend','spawnName':spawnName});
         }
 
     }
@@ -317,6 +298,24 @@ function observerTotoalUseMem() {
 }
 /* ------- ended testing logger ------- */
 
+/** process state **/
 process.on('uncaughtException', function (err) {
     console.error(err.stack);
 });
+
+process.on("exit", function () {
+    console.log("Main Thread exit.");
+    var n = clusters.length;
+    while (n-- > 0) {
+        clusters[n].stop();
+    };
+
+});
+process.on("SIGQUIT", function () {
+    console.log("user quit node process");
+    while (n-- > 0) {
+        clusters[n].stop();
+    };
+    process.exit(0);
+});
+

@@ -3,103 +3,72 @@
  * --always-compact: always full gc().
  * --expose-gc: manual gc().
  */
-
-var debug = require('debug')('LiveCluster');
-var fxNetSocket = require('./fxNetSocket');
-var FxConnection = fxNetSocket.netConnection;
+const Log = require('debug');
+const debug = Log('LiveCluster');
+const info = Log('INFO:IPCBridge');
+const fxNetSocket = require('./fxNetSocket');
+const FxConnection = fxNetSocket.netConnection;
 //var outputStream = fxNetSocket.stdoutStream;
-var parser = fxNetSocket.parser;
+const parser = fxNetSocket.parser;
 //var utilities = fxNetSocket.utilities;
 //var logger = fxNetSocket.logger;
-var fs  = require('fs');
-var net  = require('net');
-var evt = require('events');
-var cfg = require('./config.js');
-var proc = require('child_process');
-/** 所有視訊stream物件 **/
-var liveStreams = {};
+const fs  = require('fs');
+const net  = require('net');
+const evt = require('events');
+const cfg = require('./config.js');
+const proc = require('child_process');
 /** 多執行緒 **/
-var cluster = require('cluster');
-var isWorker = ('NODE_CDID' in process.env);
-var isMaster = (isWorker === false);
-var server;
+var server = null;
 var sockets = [];
-var _handle = undefined;
-
-var self = this;
-
-var srv = new FxConnection();
-setupCluster(srv);
-server = srv;
-//server.app.listen(3001);
-
 var count = 0;
-process.on('message', function(data , handle) {
+
+initizatial();
+
+function FxClusterSrvlb() {
+
+    this.setupIPCBridge();
+};
+
+FxClusterSrvlb.prototype.setupIPCBridge = function () {
+
+    var self = this;
+
+    info("setup ipc bridge connection");
+
+    process.on("SIGQUIT", this.bridgeQuitSignal);
+    process.on("disconnect", this.bridgeDisconnect);
+    process.on("message", this.bridgeMessageConversion);
+};
+FxClusterSrvlb.prototype.bridgeDisconnect = function () {
+    Info("sends a QUIT signal (SIGQUIT)");
+    process.exit(0);
+};
+FxClusterSrvlb.prototype.bridgeQuitSignal = function () {
+    Info("IPC channel exit -1");
+    process.exit(-1);
+};
+FxClusterSrvlb.prototype.bridgeMessageConversion = function (data, handle) {
     var json = data;
-    if (typeof data.evt == 'undefined') return;
 
-    if (data.evt === 'streamData') {
-        //createLiveStreams();
-        var spawnName = json.namespace;
-        var clients = server.getClients();
-        var keys = Object.keys(clients);
-        if (count != keys.length) {
-            count = keys.length;
-            console.log('clients.count.', keys.length);
-        }
-        if (keys.length == 0) return;
-        for (var i = 0; i < keys.length; i++) {
-            var socket = clients[keys[i]];
-            if (socket.isConnect == true) {
-                if (socket.namespace == spawnName) {
-                        var str = JSON.stringify({"NetStreamEvent": "NetStreamData", 'data': json.data});
-                        //debug('INFO::::%s bytes', Buffer.byteLength(str));
-                        //!!!! cpu very busy !!!
-                        socket.write(str);
+    if (typeof json === 'string') {
 
-                }
 
-            }
-        }
-        keys = null;
-    }
-        if (data.evt == 'c_equal_division') {
+    }else if (typeof json === 'object') {
 
+        if (data.evt == "c_init") {
             var socket = new net.Socket({
                 handle:handle,
-                allowHalfOpen:srv.app.allowHalfOpen
+                allowHalfOpen:server.app.allowHalfOpen
             });
             socket.readable = socket.writable = true;
             socket.resume();
-            socket.server = srv.app;
-            server.app.emit("connection", socket);
-            socket.emit("connect");
-
-            return;
-        };
-        if (data.evt == 'c_init' || data.evt == 'sendHandle') {
-
-            var socket = new net.Socket({
-                handle:handle,
-                allowHalfOpen:srv.app.allowHalfOpen
-            });
-            socket.readable = socket.writable = true;
-            socket.resume();
-            socket.server = srv.app;
+            socket.server = server.app;
             server.app.emit("connection", socket);
             socket.emit("connect");
             socket.emit('data',new Buffer(data.data));
             return;
-        };
-        if (data.evt == 'processInfo') {
-            console.log('child receive msg:%d', data);
-            process.send({"evt":"processInfo", "data": ""});
         }
-
-        if (data == 'c_socket') {
-
-            console.log("maxConnections:",server.maxConnections);
-
+        else if (data.evt === "c_socket") {
             var socket = handle;
             server.app._setupSlave([socket]);
             socket.setKeepAlive(true, 100000);
@@ -117,31 +86,74 @@ process.on('message', function(data , handle) {
             socket.emit("connect");
             return;
         }
-        if (data == 0) {
+        else if (data.evt === "streamData") {
+
+            var spawnName = json.namespace;
+            var clients = server.getClients();
+            var keys = Object.keys(clients);
+            if (count != keys.length) {
+                count = keys.length;
+                console.log('clients.count.', keys.length);
+            }
+            if (keys.length == 0) return;
+            for (var i = 0; i < keys.length; i++) {
+                var socket = clients[keys[i]];
+                if (socket.isConnect == true) {
+                    if (socket.namespace == spawnName) {
+                        var str = JSON.stringify({"NetStreamEvent": "NetStreamData", 'data': json.data});
+                        //debug('INFO::::%s bytes', Buffer.byteLength(str));
+                        //!!!! cpu very busy !!!
+                        socket.write(str);
+                    }
+
+                }
+            }
+            keys = null;
+
+        }
+        else if (data.evt === "c_equal_division") {
+            var socket = new net.Socket({
+                handle:handle,
+                allowHalfOpen:srv.app.allowHalfOpen
+            });
+            socket.readable = socket.writable = true;
+            socket.resume();
+            socket.server = server.app;
+            server.app.emit("connection", socket);
+            socket.emit("connect");
+
             return;
         }
-        else if ((typeof data.handle != 'undefined') && data.handle === 'socketSend') {
+        else if (data.evt === "socketSend") {
             socketSend(data.evt, data.spawnName);
             return;
         }
-});
+        else if (data.evt === "processInfo") {
+            process.send({"evt":"processInfo", "data": process.memoryUsage()});
+        }
 
-if (isMaster) initizatialSrv();
+    }else
+    {
+        console.log('out of hand. dismiss message');
+    }
+};
+FxClusterSrvlb.prototype.removeAllEvent = function () {
+    process.removeListener("SIGQUIT", this.bridgeQuitSignal);
+    process.removeListener("disconnect", this.bridgeDisconnect);
+    process.removeListener("message", this.bridgeMessageConversion);
+};
+
+module.exports = exports = FxClusterSrvlb;
+
+new FxClusterSrvlb();
 
 /** cluster ended **/
 
-function initizatialSrv() {
-    /** createLiveStreams **/
-        //createLiveStreams(cfg.appConfig.fileName);
-    setInterval(observerTotoalUseMem, 60000); // testing code 1.0 min
+function initizatial() {
 
-    //utilities.autoReleaseGC(); //** 手動 1 sec gc
-
-    var srv = new FxConnection(cfg.appConfig.port,{'cluster':4});
+    var srv = new FxConnection(cfg.appConfig.port);
     setupCluster(srv);
     server = srv;
-
-    isMaster = false;
 }
 
 function setupCluster(srv) {
@@ -284,7 +296,7 @@ function setupCluster(srv) {
 
 
         var headers = parser.headers.responseHeader(code, {
-            "Host": srv.app.address().address,
+            "Host": server.app.address().address,
             "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Connection": "Keep-Alive",
             "Keep-Alive": "timeout=3, max=10",
@@ -307,7 +319,7 @@ function setupCluster(srv) {
 
     }
 
-}
+};
 
 function socketSend(evt, spawnName) {
 

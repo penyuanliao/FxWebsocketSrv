@@ -14,3 +14,6 @@ exports.utilities = exports.Utilities;
 
 exports.Logger = require('./lib/FxLogger.js');
 exports.logger = exports.Logger;
+
+exports.Daemon = require('./lib/FxDaemon.js');
+exports.daemon = exports.Daemon;
