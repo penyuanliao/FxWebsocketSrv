@@ -18,12 +18,13 @@ function bench(cunt) {
             if ((connected %100) == 0) console.log('connected :: ', connected);
             group.push(ws);
         });
-        ws.on('message', function (data, flags) {
-
-            var json = JSON.parse(evt.data);
-
+        ws.on('message', function (msg) {
+            var json = JSON.parse(msg);
+            if (json.NetStreamEvent != 'NetStreamData') {
+                console.log(json);
+            }
             if (json.NetStreamEvent === "getConnections") {
-                console.log('getConnections: ', json.data.toString('utf8'));
+                console.log('getConnections: ', json.data);
             }
         });
         ws.on('error', function (error) {
@@ -37,13 +38,13 @@ function bench(cunt) {
 
 };
 
-setInterval(function () {
+setTimeout(function () {
     var ws = group[0];
     ws.send(JSON.stringify({"NetStreamEvent":"getConnections"}))
-},60000);
+},5000);
 
 
-bench(800);
+bench(40);
 
 
 function appParames(){

@@ -27,7 +27,7 @@ if (config.env == 'development') {
     };
 }
 else {
-    config.rtmpHostname = "192.168.188.72";
+    config.rtmpHostname = "192.168.188.80";//
     config.stream_proc = "ffmpeg";
     config.srvOptions = {
         'host': '0.0.0.0',
@@ -73,9 +73,16 @@ function appParames(){
                 throw "fileName no definition.";
             }
             args["fileName"] = fileName.split(" ");
+        }else if (element === "-v" ){
+            var rtmpHost = process.argv[index + 1];
+            if (!rtmpHost && typeof rtmpHost != "undefined" && rtmpHost !=0) {
+                throw "RTMP Host no definition.";
+            }else {
+                config.rtmpHostname = rtmpHost;
+            }
         }
 
-    });
+            });
 
     return args;
 }
