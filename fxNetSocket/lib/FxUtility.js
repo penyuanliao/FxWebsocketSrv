@@ -1,7 +1,7 @@
 /**
  * Created by Benson.Liao on 15/12/22.
  */
-var logger = require('./FxLogger.js');
+//var logger = require('./FxLogger.js');
 var debug = require('debug')('utility');
 var parser = require('./FxParser.js').headers;
 var fxStatus = require('./FxEnum.js').fxStatus;
@@ -42,12 +42,16 @@ FxUtility.prototype.findOutSocketConnected = function (client, chunk, self) {
     var iswebsocket = request_headers.iswebsocket;
     var general = request_headers.general;
 
-    //debug('LOG::Data received: ');
-
+    debug('LOG::Data received: %s length:%d',chunk.toString('utf8'), chunk.byteLength);
+    if ((chunk.byteLength == 0 || client.mode == fxStatus.socket || !request_headers) && !swfPolicy) {
+        client.mode = fxStatus.socket;
+        self.emit('connection', client);
+        return fxStatus.socket;
+    }
     if (unicodeNull != null && swfPolicy && client.mode != 'ws') {
         debug('[SOCKET_NET_CONNECTED]:');
         client.mode = fxStatus.flashSocket;
-
+        self.emit('connection', client);
         if (typeof self != undefined && self != null) self.emit('message', client.read(request_headers));
 
     }else if (iswebsocket) {

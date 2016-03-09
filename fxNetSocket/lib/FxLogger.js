@@ -5,16 +5,16 @@ var debug = require('debug')('Logger');
 var fs = require('fs'),
     util = require('util'),
     exec = require('child_process'),
-    log_file = fs.createWriteStream(__dirname + '/'+ formatDate() +'.log',{ flags:'w' });
+    log_file;
 var logger =  function logger() {
     /* Variables */
-
     /* Codes */
 };
 
 logger.prototype.debug = function (d) {
     var time = new Date();
     var st = "[" + time.getFullYear() + "/" + (time.getMonth() + 1) + "/" + time.getDate() + " " + time.getHours() + ":" + time.getMinutes() + "]";
+    if (typeof log_file === 'undefined') log_file = fs.createWriteStream(__dirname + '/'+ formatDate() +'.log',{ flags:'w' });
     log_file.write(st + util.format(d) + '\r\n'); // win:\r\n linux:\n mac:\r
     //debug(st, util.format(d));
 };

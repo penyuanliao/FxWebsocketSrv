@@ -64,7 +64,9 @@ function FxConnection(port, option){
         socket.once('data', function (data) {
             var mode = utility.findOutSocketConnected(client, data, self);
             debug("[Connection] Client through Server for mode " + mode);
+            if (mode == fxStatus.socket) {
 
+            }
             if (mode != fxStatus.http)
             {
                 client.isConnect = true;
@@ -95,6 +97,8 @@ function FxConnection(port, option){
                     {
                         self.clientDestroy(client);
                     }
+                }else if (mode === fxStatus.flashSocket || mode === fxStatus.socket) {
+                    data = data.toString('utf8');
                 }
 
                 self.emit("message", {'client':client,'data':data});
@@ -133,6 +137,7 @@ function FxConnection(port, option){
 
 };
 FxConnection.prototype.clientDestroy = function (client) {
+
     client.write(JSON.stringify({"NetStatusEvent":"Connect.Closed"}));
     client.close();
 };

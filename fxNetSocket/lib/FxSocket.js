@@ -40,7 +40,7 @@ FxSocket.prototype.write = function (data) {
         var buf = emit_websocket(data);
         this.socket.write(buf);
     }else if (this.mode === 'flashsocket') {
-        //emit_flashsocket(data);
+        this.socket.write(data);
     }else
     {
         this.socket.write(data);

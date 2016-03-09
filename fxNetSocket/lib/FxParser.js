@@ -133,6 +133,7 @@ Headers.prototype.onReadTCPParser = function (chuck) {
     var request_headers = this.readHeaders(chuck);
 
     var source = request_headers["source"];
+    if (typeof source === 'undefined') source = "";
     // FLASH SOCKET \0
     var unicodeNull = (typeof source === 'undefined') ? null : source.match(/\0/g); // check endpoint
 
