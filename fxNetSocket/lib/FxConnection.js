@@ -116,11 +116,8 @@ function FxConnection(port, option){
         debug('LOG::SOCKET WILL CLOSED : COUNT(%d)',Object.keys(clients).length -1);
 
         var socket = this;
-        var index = clients.indexOf(socket.name);
-        var removeItem;
-        if (index > -1) removeItem = index.splice(index, 1);
         delete clients[socket.name];
-        self.emit('disconnect', removeItem);
+        self.emit('disconnect', socket.name);
 
     };
 
@@ -140,6 +137,7 @@ FxConnection.prototype.clientDestroy = function (client) {
 
     client.write(JSON.stringify({"NetStatusEvent":"Connect.Closed"}));
     client.close();
+    self.emit('')
 };
 FxConnection.prototype.eventDispatch = function (client,evt) {
 
