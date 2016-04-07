@@ -29,7 +29,7 @@ function Fxdaemon(modulePath/*, args, options*/) {
         args = [];
         options = util._extend({}, arguments[1]);
     }
-
+    this.nodeInfo = undefined;
     this._modulePath = modulePath;
     this._options = options;
     this._args = args;
@@ -205,6 +205,9 @@ Fxdaemon.prototype = {
                 if (typeof data != 'string') {
                     data = JSON.stringify(data);
                 }
+
+                this.nodeInfo = data;
+
                 this._cpf.send({'evt':'processInfo','data':data});
             }
             catch (e) {

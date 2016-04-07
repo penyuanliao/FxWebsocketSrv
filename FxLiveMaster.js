@@ -82,7 +82,7 @@ function createServer(opt) {
         tcp_handle.close();
     };
 
-}
+};
 /** _handle Equal Division **/
 function onread_roundrobin(client_handle) {
     var worker = clusters.shift();
@@ -133,7 +133,10 @@ function onread_url_param(nread, buffer) {
 
     handle.readStop();
 };
-
+/**
+ * 建立子執行緒
+ * @param opt {cluster:(String)<js filename>, clusterNum:(Number)<count>}
+ */
 function setupCluster(opt) {
     if (typeof opt === 'undefined') {
         opt = { 'cluster': '', 'clusterNum': 0 };
@@ -150,7 +153,7 @@ function setupCluster(opt) {
             var env = process.env;
             env.NODE_CDID = i;
             //var cluster = proc.fork(opt.cluster,{silent:false}, {env:env});
-            var cluster = new daemon(opt.cluster,{silent:false}, {env:env});
+            var cluster = new daemon(opt.cluster,{silent:false}, {env:env}); //心跳系統
             cluster.init();
             cluster.name = 'ch_' + i;
             clusters.push(cluster);
@@ -214,8 +217,9 @@ function assign(namespace,cb) {
     }
 }
 
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - //
-// STREAM //
+// ================================= //
+//          FFMPEG STREAM            //
+// ================================= //
 function createLiveStreams(fileName) {
     var sn = fileName;
     var length = sn.length;
@@ -233,8 +237,7 @@ function createLiveStreams(fileName) {
             spawned = null;
         }else {
             throw "create Live Stream path error." + sn[i];
-        }
-
+        };
     };
 };
 /** 重啟stream **/

@@ -31,14 +31,61 @@
 <br>
 <script type="text/javascript">
     window.onload = load;
-
     function load() {
         var nodes = document.querySelectorAll('div.broadway');
+
+
+        const customerData = [
+            { ssn: "444-44-4444", name: "Bill", age: 35, email: "bill@company.com" },
+            { ssn: "555-55-5555", name: "Donna", age: 32, email: "donna@home.org" }
+        ];
+
+        if(!window.indexedDB) {
+            window.alert("not support indexedDB!");
+        }else
+        {
+            console.log('is support indexedDB');
+        }
+        var db, dbVersion = 5;
+        var req = window.indexedDB.open("indxDB", dbVersion);
+        req.onerror = function (evt) {
+            console.log('request.errorCode', evt);
+        };
+        req.onsuccess = function(evt) {
+            // Do something with request.result!
+            console.log('Do something with request.result!', evt);
+            db = evt.target.result;
+            console.log(db);
+        };
+        //(0)dbVersion +1 -> onupgradeneeded -> refresh -> onsuccess
+        req.onupgradeneeded = function(event) {
+            var db = event.target.result;
+            console.log('running onupgradeneeded');
+            if (!db.objectStoreNames.contains("firstOS")) {
+                db.createObjectStore("firstOS");
+                console.log('do firstOS');
+            }
+        }
+
 //        for (var i = 0; i < nodes.length; i++) {
 //            var broadway = new Broadway(nodes[i]);
 ////            broadway.decode()
 //            // broadway.play();
 //        };
+//        var rawFile = new XMLHttpRequest();
+//        rawFile.open("GET", '../js/broadway/Decoder.js', false);
+//        rawFile.onreadystatechange = function ()
+//        {
+//            if(rawFile.readyState === 4)
+//            {
+//                if(rawFile.status === 200 || rawFile.status == 0)
+//                {
+//                    var allText = rawFile.responseText;
+//                    alert(allText);
+//                }
+//            }
+//        }
+//        rawFile.send(null);
 
         var player = createPlayer(nodes[0]); // 播放器
         var ws; // websocket連線
@@ -76,18 +123,38 @@
             return array;
         };
 
-        var liveList = ["live1","live2","live3","live4","live5","live6","live7"];
+        var liveList = ["live1","live2"];
 
         for (var i = 0; i < liveList.length; i++) {
             var obj = liveList[i];
             var button = document.getElementById(obj);
-            button.onclick = onClickHandle;
+            if (i === 0) {
+                button.onclick = onClickHandle;
+            }else {
+                button.onclick = onClickHandleStop;
+            }
         }
-
+        function onClickHandleStop(e) {
+            if (typeof ws != 'undefined' && ws != null)
+            {
+                console.log('ws close onClickHandle');
+                ws.close();
+//                var context = player.canvas.getContext('webgl');;
+//                console.log(context);
+//                context.clearColor(0.0, 0.0, 0.0, 1.0);
+//                context.clear(context.COLOR_BUFFER_BIT);
+                ws.removeEventListener("open", onCloseHandle);
+                ws.removeEventListener("close", onOpenHandle);
+                ws.removeEventListener("message", onMessageHandle);
+                nodes[0].removeChild(player.canvas);
+                player = null;
+                player = createPlayer(nodes[0]);
+            };
+        }
         function onClickHandle(e) {
 
             if (typeof selectBtn != 'undefined' && selectBtn != null) {
-                selectBtn.disabled = false;
+//                selectBtn.disabled = false;
             }
 
             var btn = this;
@@ -109,13 +176,13 @@
                 player = createPlayer(nodes[0]);
             };
 
-            liveStream(btn.value);
+            liveStream(document.getElementById('live').value);
         }
 
         function liveStream(namespace) {
-            var quality = document.getElementById('quality').value;
-            console.log(quality);
-            var wsURL = 'ws://' + location.host + '/video/'+ namespace +'/' + quality + '/';
+            var select = document.getElementById('quality');
+            var quality = select.value;
+            var wsURL = 'ws://' + '183.182.70.184' + '/video/'+ namespace +'/' + quality + '/';
             ws = new WebSocket(wsURL);
             ws.onopen = onOpenHandle;
             ws.onclose = onCloseHandle;
@@ -202,6 +269,26 @@
             };
         }
 
+        //video list start
+        function changeLiveStream() {
+
+            var select = document.getElementById('quality');
+            var u_select_live = document.getElementById('live');
+            console.log('changeLiveStream',select.length,u_select_live.value);
+            if(select.length <= 2 && (u_select_live.value === 'daacb' || u_select_live.value === 'daagb')) {
+                var option = document.createElement("option");
+                option.text = "video2";
+                select.add(option);
+            }else if (select.length > 2)
+            {
+                select.remove(2);
+            }
+        }
+
+        document.getElementById('live').onchange = changeLiveStream;
+
+        //video list ended
+
         abtest();
 
         document.getElementById("notSupported").hidden = ("WebSocket" in window);
@@ -222,19 +309,40 @@
     <div class="broadway" width="640" height="300" style=" display: block;" workers="false" render="true" webgl="auto"></div>
     </br>
     <p style="display: inline-block; width: 100%">
-        <button id="live1" class="button" value="daabb" >BaccaratA</button>
-        <button id="live2" value="daabc">BaccaratB</button>
-        <button id="live3" value="daabd">BaccaratC</button>
-        <button id="live4" value="daabg">BaccaratD</button>
-        <button id="live5" value="daabh">BaccaratE</button>
-        <button id="live6" value="daabdg">BaccaratI</button>
-        <button id="live7" value="daabdh">BaccaratJ</button></br></p>
-        <p>Quality:
+
+        <button id="live1" class="button" >start</button>
+        <button id="live2" class="button" >stop</button>
+        <p>
+            Stream:
+            <select id="live" style="width: 240px;height: 34px; overflow: hidden; border: 1px solid #ccc;">
+                <option value="daabb" selected="selected">Baccarat A</option>
+                <option value="daabc">Baccarat B</option>
+                <option value="daabd">Baccarat C</option>
+                <option value="daabg">Baccarat D</option>
+                <option value="daabh">Baccarat E</option>
+                <option value="daabdg">Baccarat I</option>
+                <option value="daadgh">Baccarat J</option>
+                <option value="daadb">DragonTiger</option>
+                <option value="daacb">Mahjong</option>
+                <option value="daaib">Sicbo</option>
+                <option value="daahb">Roulette</option>
+                <option value="daagb">Paigow</option>
+                <option value="dabab">Texas</option>
+                <option value="dabbb">Sedie</option>
+                <option value="daafb">3 Face</option>
+                <option value="dabcb">Niu</option>
+                <option value="dabfb">FanTan</option>
+                <option value="dabeb">blackJack</option>
+            </select>
+            Quality:
             <select id="quality" style="width: 240px;height: 34px; overflow: hidden; border: 1px solid #ccc;">
                 <option selected="selected">video0</option>
-                <option>videosd</option>
-                <option>videohd</option>
+                <option>video1</option>
+                <!--<option>video2</option>-->
+                <!--<option>videosd</option>-->
+                <!--<option>videohd</option>-->
             </select>
+
         </p>
     </div>
     <p>----- 分隔線以下測試用 -----</p>

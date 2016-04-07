@@ -15,9 +15,19 @@ var FxSocket = function(socket, bufferPool)
     /* Variables */
     this.socket = socket;
     this.isConnect = false;
+    var self = this;
     socket.name = socket.remoteAddress + "\:" + socket.remotePort;
     this.mode = '';
     payload = (typeof bufferPool !== 'undefined') ? bufferPool : new Buffer(1024 * 32);
+    socket.on('close', function () {
+        self.isConnect = false;
+    });
+    socket.on('end',    function () {
+        self.isConnect = false;
+    });
+    socket.on('error',  function () {
+        self.isConnect = false;
+    });
 };
 
 var NSLog = function (type, str) {
@@ -41,7 +51,8 @@ FxSocket.prototype.write = function (data) {
         this.socket.write(buf);
     }else if (this.mode === 'flashsocket') {
         this.socket.write(data);
-    }else
+        this.socket.write('\0');
+    }else if (this.mode === 'socket')
     {
         this.socket.write(data);
     }
@@ -56,7 +67,7 @@ FxSocket.prototype.read = function (data) {
 
         var opcode = this.protocol.opcode;
 
-        NSLog(1,'ws-opcode: ' + this.protocol.opcode );
+        NSLog(1,'ws-opcode(read): ' + this.protocol.opcode );
 
         var obj = {opcode:opcode};
 

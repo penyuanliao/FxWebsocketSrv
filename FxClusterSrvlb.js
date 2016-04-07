@@ -151,7 +151,7 @@ new FxClusterSrvlb();
 
 function initizatial() {
 
-    var srv = new FxConnection(cfg.appConfig.port);
+    var srv = new FxConnection(cfg.appConfig.port,{runListen: false});
     setupCluster(srv);
     server = srv;
 }

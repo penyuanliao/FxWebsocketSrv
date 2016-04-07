@@ -45,6 +45,7 @@ FxUtility.prototype.findOutSocketConnected = function (client, chunk, self) {
     debug('LOG::Data received: %s length:%d',chunk.toString('utf8'), chunk.byteLength);
     if ((chunk.byteLength == 0 || client.mode == fxStatus.socket || !request_headers) && !swfPolicy) {
         client.mode = fxStatus.socket;
+        client.namespace = chunk.toString('utf8');
         self.emit('connection', client);
         return fxStatus.socket;
     }
