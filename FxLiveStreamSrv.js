@@ -5,6 +5,7 @@
  */
 
 var debug = require('debug')('Live');
+const proc = require('child_process');
 var fxNetSocket = require('./fxNetSocket');
 var FxConnection = fxNetSocket.netConnection;
 var outputStream = fxNetSocket.stdoutStream;
@@ -16,6 +17,7 @@ var evt = require('events');
 var cfg = require('./config.js');
 /** 所有視訊stream物件 **/
 var liveStreams = {};
+var doWaiting = {};
 /** createLiveStreams **/
 createLiveStreams(cfg.appConfig.fileName);
 setInterval(observerTotoalUseMem,60*60*1000); // testing code 60.0 min
@@ -155,6 +157,7 @@ function failureHeader(code, socket) {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - //
 // STREAM //
 function createLiveStreams(fileName) {
+
     var sn = fileName;
     var spawned,_name;
     for (var i = 0; i < sn.length; i++) {
@@ -162,10 +165,12 @@ function createLiveStreams(fileName) {
         _name = sn[i].toString().match(/^((rtmp[s]?):\/)?\/?([^:\/\s]+)(:([^\/]*))?((\/\w+)*\/)([\w\-\.]+[^#?\s]+)(\?([^#]*))?(#(.*))?$/i);
         if (typeof  _name[6] != 'undefined' && typeof _name[8] != 'undefined') {
             var pathname = _name[6] + _name[8];
+            console.log(sn[i]);
             spawned = liveStreams[pathname] = new outputStream(sn[i]);
             spawned.name = pathname;
             spawned.on('streamData', swpanedUpdate);
             spawned.on('close', swpanedClosed);
+            streamHeartbeat(spawned);
             spawned = null;
         }else {
             throw "create Live Stream path error." + sn[i];
@@ -175,21 +180,45 @@ function createLiveStreams(fileName) {
 
 
 };
+/** 心跳檢查ffmpeg **/
+
+function streamHeartbeat(spawned) {
+    const waitTime = 5000;
+    const pid = spawned.ffmpeg_pid.toString();
+    doWaiting[pid]= 0;
+    function todo() {
+        // debug('stream(%s %s) Heartbeat wait count:%d', spawned.name, pid, doWaiting[pid]);
+
+        if (doWaiting[pid] >= 12) { // One minute
+            //TODO pro kill -9 pid
+            proc.exec("kill -9 " + pid);
+            delete doWaiting[pid];
+        }else {
+            doWaiting[pid]++;
+            spawned.lookout = setTimeout(todo,waitTime);
+        }
+    }
+    spawned.lookout = setTimeout(todo,waitTime);
+}
+
 /** 重啟stream **/
 function rebootStream(spawned,skip) {
     if ((spawned.running == false && spawned.STATUS >= 2) || skip == true) {
-        debug('>>rebootStream:', spawned.name);
+        debug('>>rebootStream:', cfg.videoDomainName + spawned.name);
         var spawn = liveStreams[spawned.name] = new outputStream( "rtmp://" + cfg.videoDomainName + spawned.name);
-        spawn.idx = spawned.idx;
         spawn.name = spawned.name;
         spawn.on('streamData', swpanedUpdate);
+        spawn.on('close', swpanedClosed);
+        clearTimeout(spawned.lookout);
+        streamHeartbeat(spawn);
         spawned.removeListener('streamData', swpanedUpdate);
+        spawned.removeListener('close', swpanedClosed);
         spawned = null;
     }
 }
 /** ffmpeg stream pull the data of a base64 **/
 function swpanedUpdate(base64) {
-
+    doWaiting[this.ffmpeg_pid] = 0;
     var spawnName = this.name;
     var clients = srv.getClients();
     var keys = Object.keys(clients);
@@ -198,7 +227,7 @@ function swpanedUpdate(base64) {
         clients = null;
         return;
     }
-    debug('keys:',keys.length);
+    // debug('keys:',keys.length);
     for (var i = 0 ; i < keys.length; i++) {
         var socket = clients[keys[i]];
         if (socket.isConnect == true) {

@@ -19,7 +19,6 @@ const cfg = require('./config.js');
 const proc = require('child_process');
 /** 多執行緒 **/
 var server = null;
-var sockets = [];
 var count = 0;
 
 initizatial();
@@ -40,11 +39,11 @@ FxClusterSrvlb.prototype.setupIPCBridge = function () {
     process.on("message", this.bridgeMessageConversion);
 };
 FxClusterSrvlb.prototype.bridgeDisconnect = function () {
-    Info("sends a QUIT signal (SIGQUIT)");
+    info("sends a QUIT signal (SIGQUIT)");
     process.exit(0);
 };
 FxClusterSrvlb.prototype.bridgeQuitSignal = function () {
-    Info("IPC channel exit -1");
+    info("IPC channel exit -1");
     process.exit(-1);
 };
 FxClusterSrvlb.prototype.bridgeMessageConversion = function (data, handle) {
@@ -293,10 +292,10 @@ function setupCluster(srv) {
             }
         }
 
-
+        // TODO GET Parent Server.app.address().address
 
         var headers = parser.headers.responseHeader(code, {
-            "Host": server.app.address().address,
+            "Host": '127.0.0.1',
             "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Connection": "Keep-Alive",
             "Keep-Alive": "timeout=3, max=10",

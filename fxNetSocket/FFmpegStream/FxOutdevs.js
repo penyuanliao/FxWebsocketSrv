@@ -27,8 +27,6 @@ const stdoutStatus = {
     'ERROR': 3
 };
 
-var logger = require('../lib/FxLogger.js');
-
 util.inherits(FxOutdevs, events.EventEmitter);
 
 function FxOutdevs(fileName, procfile) {
@@ -83,6 +81,7 @@ FxOutdevs.prototype.init = function () {
 
         var streamDataHandler = function (chunk) {
             //debug("[OUTPUT] %d bytes", chunk.length);
+
             try {
                 if (!(chunk && chunk.length)) {
                     throw new Error("[Error] - Data is NULL.");
@@ -100,6 +99,7 @@ FxOutdevs.prototype.init = function () {
                     //debug("[Total] %d bytes", stream_data.length);
                     self.emit('streamData',stream_data.toString('base64'));
                     stream_data.writeUIntLE(0, 0, stream_data.length);
+
                     stream_data = ""; // reset stream
                 }else {
 
@@ -119,11 +119,9 @@ FxOutdevs.prototype.init = function () {
         };
 
         var stdoutCloseHandler = function(code) {
-            debug(self.name + ' you are terminated.');
-            logger.debug("[Close] close_event - Child process exited with code " + code);
+            debug("[Close] close_event - Child process exited with code " + code);
             self.running = false;
             self.STATUS = stdoutStatus.CLOSE;
-            self.emit('close', code);
             //remove event
             self.streamDelegate.removeListener("data", streamDataHandler);
             self.ffmpeg.stderr.removeListener("data", stderrDataHanlder);
@@ -132,23 +130,22 @@ FxOutdevs.prototype.init = function () {
             self.streamDelegate.removeListener("readable", readableHandler);
             self.streamDelegate.removeListener("error", streamErrorHandler);
             self.release();
+
+            self.emit('close', code);
         };
         var stdoutExitHandler = function() {
-            debug('[Debug] Hasta la vista, baby!');
             self.running = false;
             self.emit('exit');
-            logger.debug("[Exit] Exit_event - Child process exited ");
+            debug("[Exit] Exit_event - Child process exited ");
 
 
         };
         var readableHandler = function () {
-            debug('[Debug] readable first stream in here.');
-            logger.debug("[readable] readable_evnt - readable first stream in here.");
+            debug("[readable] readable_evnt - readable first stream in here.");
         };
 
         var streamErrorHandler = function(err) {
-            debug("[ERROR] Some stream error: ", err);
-            logger.debug("[streamError] Some stream error: " + err);
+            debug("[streamError] Some stream error: " + err);
             self.running = false;
             self.STATUS = stdoutStatus.ERROR;
             self.emit('error');
@@ -168,8 +165,7 @@ FxOutdevs.prototype.init = function () {
 
     }
     catch (e) {
-        debug('[ERROR]createServer::', e);
-        logger.debug("FxOutdevs Exception ERRORS: " + e);
+        debug("FxOutdevs Exception ERRORS: " + e);
     }
 };
 
@@ -178,12 +174,13 @@ FxOutdevs.prototype.quit = function () {
         debug('ffmpeg maybe termination.');
         this.running = false;
         cp.exec("kill -9 " + this.ffmpeg_pid);
-
+        console.log('FxOutdevs quit');
         this.release();
 
     }
 };
 FxOutdevs.prototype.release = function () {
+    console.log('FxOutdevs RELEASE');
     this.ffmpeg = null;
     this.ffmpeg_pid = 0;
     this.streamDelegate = null;
@@ -206,12 +203,6 @@ FxOutdevs.prototype.streamByReadBase64 = function (callback) {
 /** ffmpeg command line then pipe. use stream.pipe to send incoming to a your stream object. **/
 FxOutdevs.prototype.streamPipe = function (dest) {
   this.ffmpeg.pipe(dest);
-};
-
-/** 定期紀錄child process 狀態 太多會busy **/
-function checkProccess(proc) {
-    logger.debug("[Debug] Child process ffmpeg '" + _fileName + "' start.");
-    logger.pollingWithProcess(proc,_fileName, 60000); // 1 min
 };
 
 module.exports = exports = FxOutdevs;

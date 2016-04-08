@@ -222,7 +222,7 @@ Fxdaemon.prototype = {
             debug('server-initiated unhappy termination.');
             this._killed = true;
 
-            cp.exec("kill - 9 " + this._cpfpid);
+            cp.exec("kill -9 " + this._cpfpid);
 
             this._cpf = null;
             this._cpfpid = 0;

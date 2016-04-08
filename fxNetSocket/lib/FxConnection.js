@@ -17,8 +17,6 @@ var fxStatus = require('./FxEnum.js').fxStatus;
 
 var clients = []; // 紀錄使用者
 
-var clusterJS = "FxLiveStreamSrvCluster.js";
-
 util.inherits(FxConnection, events.EventEmitter); // 繼承事件
 
 // todo enum event dispach
@@ -137,7 +135,7 @@ FxConnection.prototype.clientDestroy = function (client) {
 
     client.write(JSON.stringify({"NetStatusEvent":"Connect.Closed"}));
     client.close();
-    self.emit('')
+    // this.emit('disconnect');
 };
 FxConnection.prototype.eventDispatch = function (client,evt) {
 

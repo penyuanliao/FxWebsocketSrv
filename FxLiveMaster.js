@@ -21,6 +21,7 @@ const cfg = require('./config.js');
 const proc = require('child_process');
 /** 所有視訊stream物件 **/
 var liveStreams = {};
+var doWaiting = []; //心跳系統等待次數紀錄
 /** 多執行緒 **/
 var isWorker = ('NODE_CDID' in process.env);
 var isMaster = (isWorker === false);
@@ -224,7 +225,7 @@ function createLiveStreams(fileName) {
     var sn = fileName;
     var length = sn.length;
     var spawned, _name, i;
-
+    debug('Init createLiveStreams');
     for (i = 0; i < length; i++) {
         // schema 2, domain 3, port 5, path 6,last path 7, file 8, querystring 9, hash 12
         _name = sn[i].toString().match(/^((rtmp[s]?):\/)?\/?([^:\/\s]+)(:([^\/]*))?((\/\w+)*\/)([\w\-\.]+[^#?\s]+)(\?([^#]*))?(#(.*))?$/i);
@@ -234,25 +235,51 @@ function createLiveStreams(fileName) {
             spawned.name = pathname;
             spawned.on('streamData', swpanedUpdate);
             spawned.on('close', swpanedClosed);
+            streamHeartbeat(spawned);
             spawned = null;
         }else {
             throw "create Live Stream path error." + sn[i];
         };
     };
 };
+
+/** 心跳檢查ffmpeg **/
+
+function streamHeartbeat(spawned) {
+    const waitTime = 5000;
+    const pid = spawned.ffmpeg_pid.toString();
+    doWaiting[pid]= 0;
+    function todo() {
+        // debug('stream(%s %s) Heartbeat wait count:%d', spawned.name, pid, doWaiting[pid]);
+
+        if (doWaiting[pid] >= 12) { // One minute
+            //TODO pro kill -9 pid
+            proc.exec("kill -9 " + pid);
+            delete doWaiting[pid];
+        }else {
+            doWaiting[pid]++;
+            spawned.lookout = setTimeout(todo,waitTime);
+        }
+    }
+    spawned.lookout = setTimeout(todo,waitTime);
+}
+
+
 /** 重啟stream **/
 function rebootStream(spawned,skip) {
     if ((spawned.running == false && spawned.STATUS >= 2) || skip == true) {
         var streamName = spawned.name.toString();
-        debug('>> rebootStream:', streamName);
+        clearTimeout(spawned.lookout);
         liveStreams[streamName].init();
+        streamHeartbeat(spawned);
+        debug('>> rebootStream:', streamName, liveStreams[streamName].ffmpeg_pid);
     };
 }
 /** ffmpeg stream pull the data of a base64 **/
 
 function swpanedUpdate(base64) {
+    doWaiting[this.ffmpeg_pid] = 0;
     var spawnName = this.name;
-
     assign(spawnName, function (worker) {
         if (worker) {
             worker.send({'evt':'streamData','namespace':spawnName,'data':base64});
