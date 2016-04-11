@@ -4,8 +4,7 @@
 var debug = require('debug')('Outdevs');
 var events = require('events');
 var util = require('util');
-var _fileName,
-    cp = require('child_process'),
+var cp = require('child_process'),
     spawn = cp.spawn;
 
 var avLog = {
@@ -32,7 +31,7 @@ util.inherits(FxOutdevs, events.EventEmitter);
 function FxOutdevs(fileName, procfile) {
 
     /*** Arguments ***/
-    _fileName = fileName;
+    this._fileName = fileName;
 
     this.running = false;
 
@@ -44,6 +43,8 @@ function FxOutdevs(fileName, procfile) {
 
     if (!procfile) {
         this._procfile = 'ffmpeg';
+    }else {
+        this._procfile = procfile;
     }
 
     /*** Initialize ***/
@@ -67,7 +68,9 @@ FxOutdevs.prototype.init = function () {
         //    "-preset:v", "ultrafast", "-tune:v", "zerolatency", "-f", "h264", "pipe:1"];
         // -r set 10 fps for flv streaming source.
         // -- , "-pass", "1"
-        var params = ["-y", "-i", _fileName, "-loglevel", avLog.quiet, "-r", "10", "-b:v", "300k", "-b:a", "8k", "-bt", "10k","-pass", "1", "-vcodec", "libx264", "-coder", "0", "-bf", "0", "-timeout", "1", "-flags", "-loop", "-wpredp", "0", "-an", "-preset:v", "ultrafast", "-tune", "zerolatency","-level:v", "5.2", "-f", "h264", "pipe:1"];
+        // var params = ["-y", "-i", _fileName, "-loglevel", avLog.quiet, "-r", "10", "-b:v", "300k", "-b:a", "8k", "-bt", "10k","-pass", "1", "-vcodec", "libx264", "-coder", "0", "-bf", "0", "-timeout", "1", "-flags", "-loop", "-wpredp", "0", "-an", "-preset:v", "ultrafast", "-tune", "zerolatency","-level:v", "5.2", "-f", "h264", "pipe:1"];
+        var params = ["-y", "-i", self._fileName, "-loglevel", avLog.quiet, "-r", "10", "-b:v", "300k", "-b:a", "8k", "-bt", "10k", "-vcodec", "libx264", "-coder", "0", "-bf", "0", "-timeout", "1", "-flags", "-loop", "-wpredp", "0", "-an", "-preset:v", "ultrafast", "-tune", "zerolatency","-level:v", "5.2", "-f", "h264", "pipe:1"];
+
         var fmParams = " " + (params.toString()).replace(/[,]/g, " ");
         debug("ffmpeg " + fmParams);
 
