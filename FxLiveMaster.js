@@ -231,7 +231,7 @@ function createLiveStreams(fileName) {
         _name = sn[i].toString().match(/^((rtmp[s]?):\/)?\/?([^:\/\s]+)(:([^\/]*))?((\/\w+)*\/)([\w\-\.]+[^#?\s]+)(\?([^#]*))?(#(.*))?$/i);
         if (typeof  _name[6] != 'undefined' && typeof _name[8] != 'undefined') {
             var pathname = _name[6] + _name[8];
-            spawned = liveStreams[pathname] = new outputStream(sn[i]);
+            spawned = liveStreams[pathname] = new outputStream(sn[i],cfg.stream_proc);
             spawned.name = pathname;
             spawned.on('streamData', swpanedUpdate);
             spawned.on('close', swpanedClosed);
