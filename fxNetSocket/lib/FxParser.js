@@ -156,13 +156,22 @@ Headers.prototype.writeHandshake = function (reqHeaders) {
 
 
     var sKey = crypto.createHash("sha1").update(reqHeaders["sec-websocket-key"] + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").digest("base64");
+
+    var protoValue = reqHeaders['sec-websocket-protocol'];
+
+    var protocol = ( protoValue ? 'Sec-WebSocket-Protocol: ' + protoValue : "");
+
     var resHeaders = [
         'HTTP/1.1 101 Switching Protocols',
         'Upgrade: websocket',
         'Connection: Upgrade',
+        'Access-Control-Allow-Origin: ' + '*',
+        protocol,
+        'Sec-WebSocket-Extensions' + reqHeaders['sec-websocket-extensions'],
+        'Sec-WebSocket-Version: ' + reqHeaders['sec-websocket-version'],
         'Sec-WebSocket-Accept: ' + sKey,
-        'Sec-WebSocket-Origin: ' + reqHeaders['Origin'],
-        'Sec-WebSocket-Location: ' + reqHeaders['Origin']
+        'Sec-WebSocket-Origin: ' + reqHeaders['origin'],
+        'Sec-WebSocket-Location: ' + reqHeaders['origin']
     ];
     return resHeaders.join(CRLF) + CRLF + CRLF;
 };

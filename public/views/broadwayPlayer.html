@@ -115,8 +115,8 @@
         function liveStream(namespace) {
             var quality = document.getElementById('quality').value;
             console.log(quality);
-            var wsURL = 'ws://' + location.host + '/video/'+ namespace +'/' + quality + '/';
-            ws = new WebSocket(wsURL);
+            var wsURL = 'ws://' + location.host + '/video/'+ namespace +'/' + quality + '/' ;
+            ws = new WebSocket(wsURL,'app2');
             ws.onopen = onOpenHandle;
             ws.onclose = onCloseHandle;
             ws.onmessage = onMessageHandle;
