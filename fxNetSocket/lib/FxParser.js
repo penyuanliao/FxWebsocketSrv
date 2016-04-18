@@ -166,13 +166,15 @@ Headers.prototype.writeHandshake = function (reqHeaders) {
         'Upgrade: websocket',
         'Connection: Upgrade',
         'Access-Control-Allow-Origin: ' + '*',
-        protocol,
         'Sec-WebSocket-Extensions' + reqHeaders['sec-websocket-extensions'],
         'Sec-WebSocket-Version: ' + reqHeaders['sec-websocket-version'],
         'Sec-WebSocket-Accept: ' + sKey,
         'Sec-WebSocket-Origin: ' + reqHeaders['origin'],
         'Sec-WebSocket-Location: ' + reqHeaders['origin']
     ];
+    if (protocol) {
+        resHeaders.push(protocol);
+    }
     return resHeaders.join(CRLF) + CRLF + CRLF;
 };
 
