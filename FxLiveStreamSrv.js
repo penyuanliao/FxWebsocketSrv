@@ -6,7 +6,7 @@
 
 var debug = require('debug')('Live');
 const proc = require('child_process');
-var fxNetSocket = require('./fxNetSocket');
+var fxNetSocket = require('fxNetSocket');
 var FxConnection = fxNetSocket.netConnection;
 var outputStream = fxNetSocket.stdoutStream;
 var parser = fxNetSocket.parser;

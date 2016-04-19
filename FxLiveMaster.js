@@ -4,7 +4,7 @@
  * --expose-gc: manual gc().
  */
 const debug = require('debug')('FxClusterlb'); //debug
-const fxNetSocket = require('./fxNetSocket');
+const fxNetSocket = require('fxNetSocket');
 const outputStream = fxNetSocket.stdoutStream;
 const parser = fxNetSocket.parser;
 const pheaders = parser.headers;

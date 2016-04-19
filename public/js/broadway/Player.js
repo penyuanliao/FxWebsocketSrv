@@ -151,7 +151,12 @@ p.decode(<binary>);
           imgData = self.imgData;
         };
 
-        imgData.data.set(buffer);
+        // imgData.data.set(buffer);
+
+        for (var i = 0; i < imgData.data.length; i++) {
+          imgData.data[i] = buffer[i];
+        }
+
         ctx.putImageData(imgData, 0, 0);
 
       };
