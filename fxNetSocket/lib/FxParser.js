@@ -139,7 +139,10 @@ Headers.prototype.onReadTCPParser = function (chuck) {
 
     var swfPolicy = source.match("<policy-file-request/>") == null; // Flash Policy
 
-    var iswebsocket = (request_headers['upgrade'] === 'websocket'); // Websocket Protocol
+    var upgrade = request_headers['upgrade'];
+    if (upgrade) upgrade.toLowerCase();
+
+    var iswebsocket = ( upgrade === 'websocket'); // Websocket Protocol
 
     request_headers['unicodeNull'] = unicodeNull; // check endpoint
     request_headers['swfPolicy'] = swfPolicy; // Flash Policy
