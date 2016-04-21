@@ -168,7 +168,8 @@
       worker.postMessage({type: "Broadway.js - Worker init", options: {
         rgb: !webgl,
         memsize: this.memsize,
-        reuseMemory: this._config.reuseMemory ? true : false
+        reuseMemory: this._config.reuseMemory ? true : false,
+        isInternet: isInternet
       }});
 
       if (this._config.transferMemory){
