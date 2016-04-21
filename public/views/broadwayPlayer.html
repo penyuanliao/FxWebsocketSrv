@@ -66,6 +66,7 @@
             var player = new Player({
                 useWorker: true,
                 webgl:true,
+                reuseMemory:false,
                 workerFile: "../js/broadway/Decoder.js"
                 ,size: { width: 640, height: 300 }
             });
@@ -150,7 +151,7 @@
             if (json.NetStreamEvent === "NetStreamData") {
 
                 var vList = String(json.data).split(',');
-                console.log("vList:",vList.length);
+//                console.log("vList:",vList.length);
                 for (var i = 0; i < vList.length; i++) {
 
                     if(!isInternet) {
