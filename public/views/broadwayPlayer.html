@@ -24,6 +24,7 @@
     </style>
     <script type="text/javascript" src="../js/broadway/Decoder.js"></script>
     <script type="text/javascript" src="../js/broadway/YUVWebGLCanvas.js"></script>
+    <script type="text/javascript" src="../js/broadway/YUVCanvas.js"></script>
     <script type="text/javascript" src="../js/broadway/Player.js"></script>
 
     <script type="text/javascript" src="../js/broadway/stream.js"></script>
@@ -53,7 +54,8 @@
 
         function createPlayer(node) {
             var player = new Player({
-                useWorker: false,
+                useWorker: true,
+                webgl:true,
                 workerFile: "../js/broadway/Decoder.js"
                 ,size: { width: 640, height: 300 }
             });
@@ -140,8 +142,13 @@
                 var vList = String(json.data).split(',');
                 console.log("vList:",vList.length);
                 for (var i = 0; i < vList.length; i++) {
-                    var bin = toUint8Array(vList[i]);
-                    player.decode(bin);
+
+                    if(-[1,]) {
+                        var bin = toUint8Array(vList[i]);
+                        player.decode(bin);
+                    }
+                    else
+                        player.decode(vList[i]); //IE Only
 //                decode.decode(bin);
                     connecttd();
                     startTime();
@@ -172,7 +179,9 @@
             var time = new Date().getTime() - st;
             console.log('Execution time:', time, 'ms');
             var nodes = document.querySelectorAll('div.timer');
-            var p = document.createElement('p');
+            var p
+
+                    = document.createElement('p');
             p.textContent = "(Connected)Execution time:" + time + "ms (" + time/1000 + ")";
             nodes[0].appendChild(p);
         });

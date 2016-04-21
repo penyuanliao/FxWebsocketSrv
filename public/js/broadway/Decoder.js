@@ -863,7 +863,17 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
     };
   };
 
-  
+    var toUint8Array = function(parStr){
+      var raw = atob(parStr);
+      var rawLength = raw.length;
+      var array = new Uint8Array(new ArrayBuffer(rawLength));
+
+      var i;
+      for(i = 0; i < rawLength; i++) {
+        array[i] = raw.charCodeAt(i);
+      }
+      return array;
+    };
   /*
     potential worker initialization
   
@@ -888,20 +898,37 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
       };
       return new ArrayBuffer(length);
     }; 
-    
+    var total;
     self.addEventListener('message', function(e) {
-      
+
       if (isWorker){
+
         if (reuseMemory){
+
+
           if (e.data.reuse){
             memAr.push(e.data.reuse);
           };
         };
-        if (e.data.buf){
+        if (e.data.buf == "base64"){
+          var ts = e.data.info.ts;
+          var bin = toUint8Array(e.data.data);
+          // console.log('message data',bin.length);
+          decoder.decode(bin);
+          total = (total + (new Date().getTime() - ts))/2;
+          console.log('Worker decode time:', new Date().getTime() - ts);
+        }
+        else if (e.data.buf){
+
           decoder.decode(new Uint8Array(e.data.buf, e.data.offset || 0, e.data.length), e.data.info);
+
+          var ts = e.data.info.ts;
+          total = (total + (new Date().getTime() - ts))/2;
+          console.log('Worker decode time:', new Date().getTime() - ts);
         };
         
       }else{
+        console.log('message isWorker Broadway');
         if (e.data && e.data.type === "Broadway.js - Worker init"){
           isWorker = true;
           decoder = new Broadway(e.data.options);
