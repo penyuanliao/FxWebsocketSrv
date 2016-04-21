@@ -112,7 +112,17 @@
       }
       return isIE;
     }
+    var toUint8Array = function(parStr){
+      var raw = atob(parStr);
+      var rawLength = raw.length;
+      var array = new Uint8Array(new ArrayBuffer(rawLength));
 
+      var i;
+      for(i = 0; i < rawLength; i++) {
+        array[i] = raw.charCodeAt(i);
+      }
+      return array;
+    };
 
 
     var onPictureDecoded = function(buffer, width, height, infos) {
@@ -160,8 +170,13 @@
           console.log(data.consoleLog);
           return;
         };
+        if (isInternet) {
+          var bin = toUint8Array(data.data);
+          onPictureDecoded.call(self, new Uint8Array(bin, 0, data.length), data.width, data.height, data.infos);
+        }
+        else
+          onPictureDecoded.call(self, new Uint8Array(data.buf, 0, data.length), data.width, data.height, data.infos);
 
-        onPictureDecoded.call(self, new Uint8Array(data.buf, 0, data.length), data.width, data.height, data.infos);
 
       }, false);
 
