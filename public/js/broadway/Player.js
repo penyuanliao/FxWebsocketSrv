@@ -101,9 +101,6 @@
     var lastWidth;
     var lastHeight;
 
-    var ua = window.navigator.userAgent;
-    var msie = ua.indexOf("MSIE ");
-
     var onPictureDecoded = function(buffer, width, height, infos) {
       self.onPictureDecoded(buffer, width, height, infos);
 
@@ -176,7 +173,7 @@
           }
           // Copy the sample so that we only do a structured clone of the
           // region of interest
-          if (msie > -1) {
+          if (-[1,]) {
             parInfo["ts"] = new Date().getTime();
             worker.postMessage({buf: "base64", data:parData, offset: 0, length: parData.length, info: parInfo}); // Send data to our worker.
           }else {
