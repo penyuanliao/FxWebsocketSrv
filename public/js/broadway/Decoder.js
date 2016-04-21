@@ -941,6 +941,7 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
         if (e.data && e.data.type === "Broadway.js - Worker init"){
           isWorker = true;
           decoder = new Broadway(e.data.options);
+          
           var isInternet = e.data.options.isInternet;
           if (e.data.options.reuseMemory){
             reuseMemory = true;
