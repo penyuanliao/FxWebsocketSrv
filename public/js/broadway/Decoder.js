@@ -965,7 +965,7 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
 
               if (isInternet) {
                 // console.log('reuseMemory.onPictureDecoded Base64');
-                // postMessage({
+                postMessage({
                   buf: "base64",
                   data: arrayBufferToBase64(buffer),
                   length: buffer.length,
@@ -975,8 +975,8 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
                 }); // 2nd parameter is used to indicate transfer of ownership
 
               }else {
-                // console.log('reuseMemory.onPictureDecoded');
-                // postMessage({
+                console.log('reuseMemory.onPictureDecoded');
+                postMessage({
                   buf: copyU8.buffer,
                   length: buffer.length,
                   width: width,

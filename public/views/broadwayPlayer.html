@@ -66,6 +66,7 @@
             var player = new Player({
                 useWorker: true,
                 webgl:true,
+                reuseMemory:true,
                 workerFile: "../js/broadway/Decoder.js"
                 ,size: { width: 640, height: 300 }
             });
