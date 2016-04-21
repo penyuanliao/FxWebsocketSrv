@@ -874,6 +874,15 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
       }
       return array;
     };
+    function _arrayBufferToBase64( buffer ) {
+      var binary = '';
+      var bytes = new Uint8Array( buffer );
+      var len = bytes.byteLength;
+      for (var i = 0; i < len; i++) {
+        binary += String.fromCharCode( bytes[ i ] );
+      }
+      return btoa( binary );
+    };
   /*
     potential worker initialization
   
@@ -943,13 +952,29 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
               var copyU8 = new Uint8Array(getMem(buffer.length));
               copyU8.set( buffer, 0, buffer.length );
 
-              postMessage({
-                buf: copyU8.buffer, 
-                length: buffer.length,
-                width: width, 
-                height: height, 
-                infos: infos
-              }, [copyU8.buffer]); // 2nd parameter is used to indicate transfer of ownership
+              if (e.data.buf == "base64") {
+
+                postMessage({
+                  buf: "base64",
+                  data: _arrayBufferToBase64(copyU8),
+                  length: buffer.length,
+                  width: width,
+                  height: height,
+                  infos: infos
+                }); // 2nd parameter is used to indicate transfer of ownership
+
+              }else {
+
+                postMessage({
+                  buf: copyU8.buffer,
+                  length: buffer.length,
+                  width: width,
+                  height: height,
+                  infos: infos
+                }, [copyU8.buffer]); // 2nd parameter is used to indicate transfer of ownership
+
+              }//base64
+
 
             };
             

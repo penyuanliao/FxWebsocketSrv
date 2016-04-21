@@ -101,7 +101,8 @@
     var lastWidth;
     var lastHeight;
     const UserAgent = window.navigator.userAgent.toLowerCase();
-    function isIE() {
+    const isInternet = checkIsIE();
+    function checkIsIE() {
       var isIE = (UserAgent.indexOf('msie') != -1);
       if (isIE == false && window.navigator.appName == 'Netscape') {
 
@@ -186,7 +187,7 @@
           }
           // Copy the sample so that we only do a structured clone of the
           // region of interest
-          if (isIE() == true) {
+          if (isInternet == true) {
             parInfo["ts"] = new Date().getTime();
             worker.postMessage({buf: "base64", data:parData, offset: 0, length: parData.length, info: parInfo}); // Send data to our worker.
           }else {
