@@ -987,14 +987,26 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
               // buffer needs to be copied because we give up ownership
               var copyU8 = new Uint8Array(buffer.length);
               copyU8.set( buffer, 0, buffer.length );
+              if (e.data.buf == "base64") {
+                postMessage({
+                  buf: "base64",
+                  data: _arrayBufferToBase64(copyU8),
+                  length: buffer.length,
+                  width: width,
+                  height: height,
+                  infos: infos
+                }); // 2nd parameter is used to indicate transfer of ownership
+              }else
+              {
+                postMessage({
+                  buf: copyU8.buffer,
+                  length: buffer.length,
+                  width: width,
+                  height: height,
+                  infos: infos
+                }, [copyU8.buffer]); // 2nd parameter is used to indicate transfer of ownership
+              }
 
-              postMessage({
-                buf: copyU8.buffer, 
-                length: buffer.length,
-                width: width, 
-                height: height, 
-                infos: infos
-              }, [copyU8.buffer]); // 2nd parameter is used to indicate transfer of ownership
 
             };
           };
