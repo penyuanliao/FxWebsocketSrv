@@ -171,9 +171,9 @@
           return;
         };
         if (isInternet) {
-          
-          
-          
+
+
+          console.log('player.js message', (typeof data.data));
           var bin = toUint8Array(data.data);
           onPictureDecoded.call(self, new Uint8Array(bin, 0, data.length), data.width, data.height, data.infos);
         }

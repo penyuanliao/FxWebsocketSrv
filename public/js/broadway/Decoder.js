@@ -947,11 +947,11 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
         };
         
       }else{
-        console.log('message isWorker Broadway');
+        console.log('message not isWorker Broadway');
         if (e.data && e.data.type === "Broadway.js - Worker init"){
           isWorker = true;
           decoder = new Broadway(e.data.options);
-
+          console.log('Decoder.js - Broadway.js - Worker init isInternet:',e.data.options.isInternet);
           var isInternet = e.data.options.isInternet;
           if (e.data.options.reuseMemory){
             reuseMemory = true;
@@ -998,6 +998,7 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
               // buffer needs to be copied because we give up ownership
               var copyU8 = new Uint8Array(buffer.length);
               copyU8.set( buffer, 0, buffer.length );
+              console.log('Decoder.js onPictureDecoded:length', buffer.length, "infos:", infos);
               if (e.data.buf == "base64" || isInternet) {
                 postMessage({
                   buf: "base64",
