@@ -104,8 +104,9 @@
     function isIE() {
       var isIE = (UserAgent.indexOf('msie') != -1);
       if (isIE == false && window.navigator.appName == 'Netscape') {
+
         var re  = new RegExp("Trident/.*rv:([0-9]{1,}[\.0-9]{0,})");  //for IE 11
-        if (re.exec(ua) != null)
+        if (re.exec(UserAgent) != null)
           isIE = true;
       }
       return isIE;
