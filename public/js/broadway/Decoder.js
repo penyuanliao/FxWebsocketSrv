@@ -941,7 +941,7 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
         if (e.data && e.data.type === "Broadway.js - Worker init"){
           isWorker = true;
           decoder = new Broadway(e.data.options);
-          
+          var isInternet = e.options.isInternet;
           if (e.data.options.reuseMemory){
             reuseMemory = true;
             decoder.onPictureDecoded = function (buffer, width, height, infos) {
@@ -987,7 +987,7 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
               // buffer needs to be copied because we give up ownership
               var copyU8 = new Uint8Array(buffer.length);
               copyU8.set( buffer, 0, buffer.length );
-              if (e.data.buf == "base64" || e.options.isInternet) {
+              if (e.data.buf == "base64" || isInternet) {
                 postMessage({
                   buf: "base64",
                   data: _arrayBufferToBase64(copyU8),
