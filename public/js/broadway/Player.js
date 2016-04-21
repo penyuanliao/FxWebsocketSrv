@@ -363,7 +363,10 @@
         imgData = canvasObj.imgData;
       };
 
-      imgData.data.set(options.data);
+      // imgData.data.set(options.data);
+      for (var i = 0; i < imgData.data.length; i++) {
+        imgData.data[i] = options.data[i];
+      }
       ctx.putImageData(imgData, 0, 0);
       var self = this;
       self.recycleMemory(options.data);
