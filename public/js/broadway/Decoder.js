@@ -881,7 +881,7 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
       for (var i = 0; i < len; i++) {
         binary += String.fromCharCode( bytes[ i ] );
       }
-      return window.btoa( binary );
+      return btoa( binary );
     }
 
     function base64ToArrayBuffer(base64) {
