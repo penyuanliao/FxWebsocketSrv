@@ -4,7 +4,7 @@
  * --expose-gc: manual gc().
  */
 var debug = require('debug')('LiveCluster');
-var fxNetSocket = require('./fxNetSocket');
+var fxNetSocket = require('./../fxNetSocket/index');
 var FxConnection = fxNetSocket.netConnection;
 var outputStream = fxNetSocket.stdoutStream;
 var parser = fxNetSocket.parser;
@@ -13,7 +13,7 @@ var logger = fxNetSocket.logger;
 var fs  = require('fs');
 var net  = require('net');
 var evt = require('events');
-var cfg = require('./config.js');
+var cfg = require('./../config.js');
 var proc = require('child_process');
 /** 所有視訊stream物件 **/
 var liveStreams = {};

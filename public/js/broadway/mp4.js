@@ -9,7 +9,7 @@ function assert(condition, message) {
 
 
 /**
- * Represents a 2-dimensional size value. 
+ * Represents a 2-dimensional size value.
  */
 var Size = (function size() {
   function constructor(w, h) {
@@ -414,7 +414,7 @@ var MP4Reader = (function reader() {
         case 'avcC':
           box.name = "AVC Configuration Box";
           box.configurationVersion = stream.readU8();
-          box.avcProfileIndicaation = stream.readU8();
+          box.avcProfileIndication = stream.readU8();
           box.profileCompatibility = stream.readU8();
           box.avcLevelIndication = stream.readU8();
           box.lengthSizeMinusOne = stream.readU8() & 3;
@@ -451,7 +451,7 @@ var MP4Reader = (function reader() {
           box.name = "Sample to Chunk Box";
           readFullHeader();
           box.table = stream.readU32Array(stream.readU32(), 3,
-            ["firstChunk", "samplesPerChunk", "sampleDescriptionId"]);
+              ["firstChunk", "samplesPerChunk", "sampleDescriptionId"]);
           break;
         case 'stsz':
           box.name = "Sample Size Box";
@@ -580,7 +580,7 @@ var Track = (function track () {
         var row = table[0];
         assert (row.firstChunk === 1);
         return {
-          index: sample / row.samplesPerChunk,
+          index: Math.floor(sample / row.samplesPerChunk),
           offset: sample % row.samplesPerChunk
         };
       }
@@ -689,20 +689,20 @@ var Track = (function track () {
     },
     foo: function () {
       /*
-      for (var i = 0; i < this.getSampleCount(); i++) {
-        var res = this.sampleToChunk(i);
-        console.info("Sample " + i + " -> " + res.index + " % " + res.offset +
-                     " @ " + this.chunkToOffset(res.index) +
-                     " @@ " + this.sampleToOffset(i));
-      }
-      console.info("Total Time: " + this.timeToSeconds(this.getTotalTime()));
-      var total = this.getTotalTimeInSeconds();
-      for (var i = 50; i < total; i += 0.1) {
-        // console.info("Time: " + i.toFixed(2) + " " + this.secondsToTime(i));
+       for (var i = 0; i < this.getSampleCount(); i++) {
+       var res = this.sampleToChunk(i);
+       console.info("Sample " + i + " -> " + res.index + " % " + res.offset +
+       " @ " + this.chunkToOffset(res.index) +
+       " @@ " + this.sampleToOffset(i));
+       }
+       console.info("Total Time: " + this.timeToSeconds(this.getTotalTime()));
+       var total = this.getTotalTimeInSeconds();
+       for (var i = 50; i < total; i += 0.1) {
+       // console.info("Time: " + i.toFixed(2) + " " + this.secondsToTime(i));
 
-        console.info("Time: " + i.toFixed(2) + " " + this.timeToSample(this.secondsToTime(i)));
-      }
-      */
+       console.info("Time: " + i.toFixed(2) + " " + this.timeToSample(this.secondsToTime(i)));
+       }
+       */
     },
     /**
      * AVC samples contain one or more NAL units each of which have a length prefix.
@@ -728,31 +728,31 @@ var Track = (function track () {
 // Only add setZeroTimeout to the window object, and hide everything
 // else in a closure. (http://dbaron.org/log/20100309-faster-timeouts)
 (function() {
-    var timeouts = [];
-    var messageName = "zero-timeout-message";
+  var timeouts = [];
+  var messageName = "zero-timeout-message";
 
-    // Like setTimeout, but only takes a function argument.  There's
-    // no time argument (always zero) and no arguments (you have to
-    // use a closure).
-    function setZeroTimeout(fn) {
-        timeouts.push(fn);
-        window.postMessage(messageName, "*");
+  // Like setTimeout, but only takes a function argument.  There's
+  // no time argument (always zero) and no arguments (you have to
+  // use a closure).
+  function setZeroTimeout(fn) {
+    timeouts.push(fn);
+    window.postMessage(messageName, "*");
+  }
+
+  function handleMessage(event) {
+    if (event.source == window && event.data == messageName) {
+      event.stopPropagation();
+      if (timeouts.length > 0) {
+        var fn = timeouts.shift();
+        fn();
+      }
     }
+  }
 
-    function handleMessage(event) {
-        if (event.source == window && event.data == messageName) {
-            event.stopPropagation();
-            if (timeouts.length > 0) {
-                var fn = timeouts.shift();
-                fn();
-            }
-        }
-    }
+  window.addEventListener("message", handleMessage, true);
 
-    window.addEventListener("message", handleMessage, true);
-
-    // Add the one thing we want added to the window object.
-    window.setZeroTimeout = setZeroTimeout;
+  // Add the one thing we want added to the window object.
+  window.setZeroTimeout = setZeroTimeout;
 })();
 
 var MP4Player = (function reader() {
@@ -784,20 +784,21 @@ var MP4Player = (function reader() {
 
     this.avc = new Player({
       useWorker: useWorkers,
+      reuseMemory: true,
       webgl: webgl,
       size: {
         width: 640,
         height: 368
       }
     });
-    
+
     this.webgl = this.avc.webgl;
-    
+
     var self = this;
     this.avc.onPictureDecoded = function(){
       updateStatistics.call(self);
     };
-    
+
     this.canvas = this.avc.canvas;
   }
 
@@ -896,10 +897,10 @@ var Broadway = (function broadway() {
     this.info.setAttribute('style', "font-size: 14px; font-weight: bold; padding: 6px; color: lime;");
     controls.appendChild(this.info);
     div.appendChild(controls);
-    
+
     var useWorkers = div.attributes.workers ? div.attributes.workers.value == "true" : false;
     var render = div.attributes.render ? div.attributes.render.value == "true" : false;
-    
+
     var webgl = "auto";
     if (div.attributes.webgl){
       if (div.attributes.webgl.value == "true"){
@@ -909,7 +910,7 @@ var Broadway = (function broadway() {
         webgl = false;
       };
     };
-    
+
     var infoStrPre = "Click canvas to load and play - ";
     var infoStr = "";
     if (useWorkers){
@@ -924,11 +925,11 @@ var Broadway = (function broadway() {
       this.play();
     }.bind(this);
     div.appendChild(this.canvas);
-    
-    
+
+
     infoStr += " - webgl: " + this.player.webgl;
     this.info.innerHTML = infoStrPre + infoStr;
-    
+
 
     this.score = null;
     this.player.onStatisticsUpdated = function (statistics) {

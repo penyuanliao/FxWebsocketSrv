@@ -41,7 +41,7 @@ else {
         'clusterNum': 7//config.numCPUs -1
     };
 }
-config.assignRule = [['daabb','daabc','daabd','daaib'], ['daace','daacf','daacde'],['daacdf','daadb','daacb'], ['daaib','daahb','daagb'], ['dabab','dabbb','daafb'], ['dabcb','dabfb','dabeb']];
+config.assignRule = [['daabb','daabc','daabd','daaib','daabg'], ['daace','daacf','daacde'],['daacdf','daadb','daacb'], ['daaib','daahb','daagb'], ['dabab','dabbb','daafb'], ['dabcb','dabfb','dabeb']];
 
 //if (config.assignRule.length < config.forkOptions.num) throw new Error("assignRule != forkOptions.num");
 
