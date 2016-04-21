@@ -101,7 +101,7 @@
     var lastWidth;
     var lastHeight;
     const UserAgent = window.navigator.userAgent.toLowerCase();
-    const isInternet = checkIsIE();
+    const isInternet = true;//checkIsIE();
     function checkIsIE() {
       var isIE = (UserAgent.indexOf('msie') != -1);
       if (isIE == false && window.navigator.appName == 'Netscape') {
@@ -113,7 +113,7 @@
       return isIE;
     }
     var toUint8Array = function(parStr){
-      var raw = atob(parStr);
+      var raw = window.atob(parStr);
       var rawLength = raw.length;
       var array = new Uint8Array(new ArrayBuffer(rawLength));
 
@@ -171,6 +171,9 @@
           return;
         };
         if (isInternet) {
+          
+          
+          
           var bin = toUint8Array(data.data);
           onPictureDecoded.call(self, new Uint8Array(bin, 0, data.length), data.width, data.height, data.infos);
         }

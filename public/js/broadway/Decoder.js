@@ -935,7 +935,7 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
           // console.log('message data',bin.length);
           decoder.decode(bin);
           total = (total + (new Date().getTime() - ts))/2;
-          console.log('Worker decode time:', new Date().getTime() - ts);
+          // console.log('Worker base64 decode time:', new Date().getTime() - ts);
         }
         else if (e.data.buf){
 
@@ -943,7 +943,7 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
 
           var ts = e.data.info.ts;
           total = (total + (new Date().getTime() - ts))/2;
-          console.log('Worker decode time:', new Date().getTime() - ts);
+          // console.log('Worker decode time:', new Date().getTime() - ts);
         };
         
       }else{
@@ -963,9 +963,9 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
               var copyU8 = new Uint8Array(getMem(buffer.length));
               copyU8.set( buffer, 0, buffer.length );
 
-              if (e.data.buf == "base64") {
-
-                postMessage({
+              if (isInternet) {
+                // console.log('reuseMemory.onPictureDecoded Base64');
+                // postMessage({
                   buf: "base64",
                   data: arrayBufferToBase64(buffer),
                   length: buffer.length,
@@ -975,8 +975,8 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
                 }); // 2nd parameter is used to indicate transfer of ownership
 
               }else {
-
-                postMessage({
+                // console.log('reuseMemory.onPictureDecoded');
+                // postMessage({
                   buf: copyU8.buffer,
                   length: buffer.length,
                   width: width,
