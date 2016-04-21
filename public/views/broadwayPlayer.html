@@ -32,7 +32,8 @@
 <br>
 <script type="text/javascript">
     window.onload = load;
-
+    const UserAgent = window.navigator.userAgent.toLowerCase();
+    const isIE = (userAgent.indexOf('msie') != -1);
     function load() {
         var nodes = document.querySelectorAll('div.broadway');
 //        for (var i = 0; i < nodes.length; i++) {
@@ -143,7 +144,7 @@
                 console.log("vList:",vList.length);
                 for (var i = 0; i < vList.length; i++) {
 
-                    if(-[1,]) {
+                    if(!isIE) {
                         var bin = toUint8Array(vList[i]);
                         player.decode(bin);
                     }

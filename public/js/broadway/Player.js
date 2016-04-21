@@ -100,7 +100,8 @@
 
     var lastWidth;
     var lastHeight;
-
+    const UserAgent = window.navigator.userAgent.toLowerCase();
+    const isIE = (userAgent.indexOf('msie') != -1);
     var onPictureDecoded = function(buffer, width, height, infos) {
       self.onPictureDecoded(buffer, width, height, infos);
 
@@ -173,7 +174,7 @@
           }
           // Copy the sample so that we only do a structured clone of the
           // region of interest
-          if (!-[1,]) {
+          if (isIE == true) {
             parInfo["ts"] = new Date().getTime();
             worker.postMessage({buf: "base64", data:parData, offset: 0, length: parData.length, info: parInfo}); // Send data to our worker.
           }else {
