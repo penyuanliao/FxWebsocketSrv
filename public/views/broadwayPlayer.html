@@ -33,7 +33,7 @@
 <script type="text/javascript">
     window.onload = load;
     const UserAgent = window.navigator.userAgent.toLowerCase();
-``    const isInternet = true;//checkIsIE();
+    const isInternet = true;//checkIsIE();
     function checkIsIE() {
         var isIE = (UserAgent.indexOf('msie') != -1);
         if (isIE == false && window.navigator.appName == 'Netscape') {
@@ -66,7 +66,6 @@
             var player = new Player({
                 useWorker: true,
                 webgl:true,
-                reuseMemory:true,
                 workerFile: "../js/broadway/Decoder.js"
                 ,size: { width: 640, height: 300 }
             });
