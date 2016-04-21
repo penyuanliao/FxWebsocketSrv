@@ -101,7 +101,7 @@
     var lastWidth;
     var lastHeight;
     const UserAgent = window.navigator.userAgent.toLowerCase();
-    const isIE = (userAgent.indexOf('msie') != -1);
+    const isIE = (UserAgent.indexOf('msie') != -1);
     var onPictureDecoded = function(buffer, width, height, infos) {
       self.onPictureDecoded(buffer, width, height, infos);
 
