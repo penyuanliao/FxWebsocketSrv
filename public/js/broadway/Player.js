@@ -101,7 +101,18 @@
     var lastWidth;
     var lastHeight;
     const UserAgent = window.navigator.userAgent.toLowerCase();
-    const isIE = (UserAgent.indexOf('msie') != -1);
+    function isIE() {
+      var isIE = (UserAgent.indexOf('msie') != -1);
+      if (isIE == false && window.navigator.appName == 'Netscape') {
+        var re  = new RegExp("Trident/.*rv:([0-9]{1,}[\.0-9]{0,})");  //for IE 11
+        if (re.exec(ua) != null)
+          isIE = true;
+      }
+      return isIE;
+    }
+
+
+
     var onPictureDecoded = function(buffer, width, height, infos) {
       self.onPictureDecoded(buffer, width, height, infos);
 
@@ -174,7 +185,7 @@
           }
           // Copy the sample so that we only do a structured clone of the
           // region of interest
-          if (isIE == true) {
+          if (isIE() == true) {
             parInfo["ts"] = new Date().getTime();
             worker.postMessage({buf: "base64", data:parData, offset: 0, length: parData.length, info: parInfo}); // Send data to our worker.
           }else {

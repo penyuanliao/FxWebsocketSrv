@@ -33,7 +33,15 @@
 <script type="text/javascript">
     window.onload = load;
     const UserAgent = window.navigator.userAgent.toLowerCase();
-    const isIE = (UserAgent.indexOf('msie') != -1);
+    function isIE() {
+        var isIE = (UserAgent.indexOf('msie') != -1);
+        if (isIE == false && window.navigator.appName == 'Netscape') {
+            var re  = new RegExp("Trident/.*rv:([0-9]{1,}[\.0-9]{0,})");  //for IE 11
+            if (re.exec(ua) != null)
+                isIE = true;
+        }
+        return isIE;
+    }
     function load() {
         var nodes = document.querySelectorAll('div.broadway');
 //        for (var i = 0; i < nodes.length; i++) {
@@ -144,7 +152,7 @@
                 console.log("vList:",vList.length);
                 for (var i = 0; i < vList.length; i++) {
 
-                    if(!isIE) {
+                    if(!isIE()) {
                         var bin = toUint8Array(vList[i]);
                         player.decode(bin);
                     }
