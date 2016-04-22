@@ -102,6 +102,20 @@
             var button = document.getElementById(obj);
             button.onclick = onClickHandle;
         }
+        // stop stream
+        var close = document.getElementById('close');
+        close.onclick = function (e) {
+            if (typeof ws != 'undefined' && ws != null) {
+                console.log('ws close onClickHandle');
+                ws.close();
+                ws.removeEventListener("open", onCloseHandle);
+                ws.removeEventListener("close", onOpenHandle);
+                ws.removeEventListener("message", onMessageHandle);
+                nodes[0].removeChild(player.canvas);
+                player = null;
+                player = createPlayer(nodes[0]);            }
+        };
+
 
         function onClickHandle(e) {
 
@@ -264,6 +278,7 @@
         <button id="live5" value="daabh">BaccaratE</button>
         <button id="live6" value="daabdg">BaccaratI</button>
         <button id="live7" value="daabdh">BaccaratJ</button></br></p>
+        <button id="close" value="close" style="background-color:#d43f3a;border-color:#d9534f;border-radius:20px;">STOP!!</button>
         <p>Quality:
             <select id="quality" style="width: 240px;height: 34px; overflow: hidden; border: 1px solid #ccc;">
                 <option selected="selected">video0</option>
