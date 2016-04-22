@@ -26,12 +26,12 @@
 (function (root, factory) {
   if (typeof define === 'function' && define.amd) {
     // AMD. Register as an anonymous module.
-    define(["./Decoder", "./YUVWebGLCanvas"], factory);
+    define(["./Decoder", "./YUVCanvas"], factory);
   } else if (typeof exports === 'object') {
     // Node. Does not work with strict CommonJS, but
     // only CommonJS-like environments that support module.exports,
     // like Node.
-    module.exports = factory(require("./Decoder"), require("./YUVWebGLCanvas"));
+    module.exports = factory(require("./Decoder"), require("./YUVCanvas"));
   } else {
     // Browser globals (root is window)
     root.Player = factory(root.Decoder, root.YUVCanvas);
@@ -173,7 +173,7 @@
         if (isInternet) {
 
 
-          console.log('player.js message', (typeof data.data));
+          // console.log('player.js message', (typeof data.data));
           var bin = toUint8Array(data.data);
           onPictureDecoded.call(self, new Uint8Array(bin, 0, data.length), data.width, data.height, data.infos);
         }

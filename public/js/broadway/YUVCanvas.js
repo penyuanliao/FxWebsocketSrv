@@ -225,7 +225,7 @@
             if(!gl || typeof gl.getParameter !== "function") {
                 gl = null;
             }
-            alert('Unable to initialize WebGL. Your browser may not support it.');
+
             ++nameIndex;
         };
 

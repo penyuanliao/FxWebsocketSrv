@@ -998,7 +998,7 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
               // buffer needs to be copied because we give up ownership
               var copyU8 = new Uint8Array(buffer.length);
               copyU8.set( buffer, 0, buffer.length );
-              console.log('Decoder.js onPictureDecoded:length', buffer.length, "infos:", infos);
+              // console.log('Decoder.js onPictureDecoded:length', buffer.length, "infos:", infos);
               if (e.data.buf == "base64" || isInternet) {
                 postMessage({
                   buf: "base64",

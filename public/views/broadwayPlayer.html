@@ -63,10 +63,16 @@
         };
 
         function createPlayer(node) {
+
+            var worker = document.getElementById("worker").checked;
+            var webgl = document.getElementById("webgl").checked;
+            var reuseMemory = document.getElementById("reuseMemory").checked;
+            console.log("worker:",worker);
+
             var player = new Player({
-                useWorker: true,
-                webgl:true,
-                reuseMemory:false,
+                useWorker: worker,
+                webgl:webgl, // IE need close
+                reuseMemory:reuseMemory,
                 workerFile: "../js/broadway/Decoder.js"
                 ,size: { width: 640, height: 300 }
             });
@@ -265,6 +271,9 @@
                 <option>videohd</option>
             </select>
         </p>
+        <input id="worker" type="checkbox" name="worker" value="1" checked>Use Worker?</input>
+        <input id="webgl" type="checkbox" name="webgl" value="1" checked>Use webgl?</input>
+        <input id="reuseMemory" type="checkbox" name="reuseMemory" value="1" checked>Use reuse Memory?</input>
     </div>
     <p>----- 分隔線以下測試用 -----</p>
     <p>Test count: <input id="runcount" value="1"/></p>
