@@ -300,9 +300,34 @@
 
         document.getElementById("notSupported").hidden = ("WebSocket" in window);
         document.getElementById("isSupported").hidden = !("WebSocket" in window);
+
+
+
+
+        
         var nodes2 = document.querySelectorAll('div.broadway2');
         var H264player = createPlayer(nodes2[0]);
         var ws2 = null;
+
+        var del_btn = document.getElementById('delete_p');
+        var create_btn = document.getElementById('create_p');
+
+        del_btn.onclick = removePlayer;
+        create_btn.onclick = initPlayer;
+
+
+        function initPlayer(e) {
+            console.log('create');
+            H264player = createPlayer(nodes2[0]);
+        }
+        function removePlayer(e) {
+            console.log('delete');
+            nodes2[0].removeChild(H264player.canvas);
+            delete H264player;
+            H264player = null;
+        }
+        
+        
         var sub = document.getElementById('subLive');
 
         sub.onclick = function (e) {
@@ -310,6 +335,10 @@
             sub.disabled = false;
             nodes2.disabled = true;
         };
+        
+        
+        
+        
         var close2 = document.getElementById('close2');
         close2.disabled = true;
         close2.onclick = function (e) {
@@ -377,7 +406,8 @@
     <p style="display: inline-block; width: 100%">
         <button id="subLive">add video</button>
         <button id="close2"><-- STOP!!</button>
-
+        <button id="delete_p">delete Canvas</button>
+        <button id="create_p">create Canvas</button>
     </p>
     <div class="timer"></div>
 </body>
