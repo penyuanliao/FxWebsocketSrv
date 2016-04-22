@@ -33,7 +33,7 @@
 <script type="text/javascript">
     window.onload = load;
     const UserAgent = window.navigator.userAgent.toLowerCase();
-    const isInternet = true;//checkIsIE();
+    const isInternet = checkIsIE();
     function checkIsIE() {
         var isIE = (UserAgent.indexOf('msie') != -1);
         if (isIE == false && window.navigator.appName == 'Netscape') {
@@ -145,6 +145,50 @@
             liveStream(btn.value);
         }
 
+        function createWebsocketConnect(namespace, H264Player, cb) {
+
+            var quality = document.getElementById('quality').value;
+            var wsURL = 'ws://' + location.host + '/video/'+ namespace +'/' + quality + '/' ;
+            var ws2 = new WebSocket(wsURL,'app2');
+            ws2.onopen = function (e) {
+                
+            };
+            ws2.onclose = function (e) {
+                console.log('ls close');
+                ws2.close();
+                ws2.removeEventListener("open", onCloseHandle);
+                ws2.removeEventListener("close", onOpenHandle);
+                ws2.removeEventListener("message", onMessageHandle);
+                if (cb) {
+                    cb("close");
+                }
+            };
+            ws2.onmessage = function (evt) {
+                var json = JSON.parse(evt.data);
+                if (json.NetStreamEvent === "NetStreamData") {
+
+                    var vList = String(json.data).split(',');
+
+                    for (var i = 0; i < vList.length; i++) {
+
+                        if(!isInternet) {
+                            var bin = toUint8Array(vList[i]);
+                            H264Player.decode(bin);
+                        }
+                        else
+                            H264Player.decode(vList[i]); //IE Only
+
+                    }
+
+
+                }
+            };
+
+            return ws2;
+
+        }
+
+
         function liveStream(namespace) {
             var quality = document.getElementById('quality').value;
             console.log(quality);
@@ -161,8 +205,8 @@
         };
         function onOpenHandle(evt){
             console.log('websocket on connected.');
-            ws.send("hi server");
-            ws.send(JSON.stringify({"NetStreamEvent":"getConnections"}));
+//            ws.send("hi server");
+//            ws.send(JSON.stringify({"NetStreamEvent":"getConnections"}));
         };
         function onMessageHandle(evt) {
 //            console.log('data connected.',evt);
@@ -230,6 +274,7 @@
         });
         //壓測用
         function abtest(){
+            return;
             var button = document.getElementById("abtesting");
             button.onclick = function (e) {
                 var name = document.getElementById("videoName");
@@ -255,6 +300,40 @@
 
         document.getElementById("notSupported").hidden = ("WebSocket" in window);
         document.getElementById("isSupported").hidden = !("WebSocket" in window);
+        var nodes2 = document.querySelectorAll('div.broadway2');
+        var H264player = createPlayer(nodes2[0]);
+        var ws2 = null;
+        var sub = document.getElementById('subLive');
+
+        sub.onclick = function (e) {
+            addVideo2();
+            sub.disabled = false;
+            nodes2.disabled = true;
+        };
+        var close2 = document.getElementById('close2');
+        close2.disabled = true;
+        close2.onclick = function (e) {
+            if (typeof ws2 != 'undefined' && ws2 != null) {
+                console.log('ws close onClickHandle');
+                ws2.close();
+                sub.disabled = true;
+                nodes2.disabled = false;
+            }
+        };
+
+        function addVideo2() {
+
+            var name = document.getElementById("videoName");
+
+            ws2 = createWebsocketConnect(name.value,H264player,function (evt) {
+                if (evt == 'close') {
+                    nodes2[0].removeChild(H264player.canvas);
+                    H264player = null;
+                    delete H264player;
+                    H264player = createPlayer(nodes2[0]);
+                }
+            });
+        }
 
     };
 </script>
@@ -291,10 +370,15 @@
         <input id="reuseMemory" type="checkbox" name="reuseMemory" value="1" checked>Use reuse Memory?</input>
     </div>
     <p>----- 分隔線以下測試用 -----</p>
-    <p>Test count: <input id="runcount" value="1"/></p>
+    <!--<p>Test count: <input id="runcount" value="1"/></p>-->
+    <div class="broadway2" style=" display: block;" workers="false" render="true" webgl="auto"></div>
     <p>URL: <input id="videoName" value="daabc" style="width: 300px"/></p>
-    <p><button id="abtesting">test</button></p>
+<!--<p><button id="abtesting">test</button></p>-->
+    <p style="display: inline-block; width: 100%">
+        <button id="subLive">add video</button>
+        <button id="close2"><-- STOP!!</button>
 
+    </p>
     <div class="timer"></div>
 </body>
 </html>

@@ -101,7 +101,7 @@
     var lastWidth;
     var lastHeight;
     const UserAgent = window.navigator.userAgent.toLowerCase();
-    const isInternet = true;//checkIsIE();
+    const isInternet = checkIsIE();
     function checkIsIE() {
       var isIE = (UserAgent.indexOf('msie') != -1);
       if (isIE == false && window.navigator.appName == 'Netscape') {
