@@ -10,10 +10,9 @@ const fxNetSocket = require('fxNetSocket');
 const FxConnection = fxNetSocket.netConnection;
 //var outputStream = fxNetSocket.stdoutStream;
 const parser = fxNetSocket.parser;
-var utilities = fxNetSocket.utilities;
+//var utilities = fxNetSocket.utilities;
 //var logger = fxNetSocket.logger;
 const fs  = require('fs');
-const path = require('path');
 const net  = require('net');
 const evt = require('events');
 const cfg = require('./config.js');
@@ -103,13 +102,10 @@ FxClusterSrvlb.prototype.bridgeMessageConversion = function (data, handle) {
                         var str = JSON.stringify({"NetStreamEvent": "NetStreamData", 'data': json.data});
                         //debug('INFO::::%s bytes', Buffer.byteLength(str));
                         //!!!! cpu very busy !!!
-
+                        socket.write(str);
                         console.log('INFO::::%s bytes(%s)', Buffer.byteLength(str),socket.mode);
                         if (socket.mode == 'socket') {
-                            socket.write(str+'\0');
-                        }else
-                        {
-                            socket.write(str);
+                            socket.end
                         }
                     }
 
@@ -217,8 +213,8 @@ function setupCluster(srv) {
         var socket = client.socket;
 
         if (_get[1] === "/") {
-            var file = path.join(__dirname, '/public/views/broadwayPlayer.html');
-            fs.readFile(file, function (err, data) {
+
+            fs.readFile('./public/views/broadwayPlayer.html', function (err, data) {
                 successfulHeader(200, socket, "html");
                 socket.write(data);
                 socket.end();
@@ -226,8 +222,7 @@ function setupCluster(srv) {
             });
         }
         else if (_get[1].indexOf('.html') != -1) {
-            var file = path.join(__dirname, '/public', _get[1]);
-            fs.readFile(file, function (err, data) {
+            fs.readFile("./public" + _get[1], function (err, data) {
                 successfulHeader(200, socket, "html");
                 socket.write(data);
                 socket.end();
@@ -235,15 +230,12 @@ function setupCluster(srv) {
             });
         }
         else if  (_get[1].indexOf('.png') != -1) {
-
-            var file = path.join(__dirname, '/public', _get[1]);
-
-            var stat = fs.statSync(file);
+            var stat = fs.statSync("./public" + _get[1]);
 
 
             socket.setEncoding('binary');
 
-            var fileWriteStream1 = fs.createReadStream(file);
+            var fileWriteStream1 = fs.createReadStream("./public" + _get[1]);
             fileWriteStream1.pipe(socket);
             //successfulHeader(200, socket, { 'Content-Type' : 'image/png'});
         }
@@ -254,8 +246,8 @@ function setupCluster(srv) {
             }else {
                 successfulHeader(200, socket, "js");
             }
-            var file = path.join(__dirname, '/public', _get[1]);
-            var fsstream = fs.createReadStream(file, {bufferSize: 1024 * 300, end:false});
+
+            var fsstream = fs.createReadStream("./public" + _get[1], {bufferSize: 1024 * 300, end:false});
             var fileLength = 0;
             fsstream.on('open', function () {
 
