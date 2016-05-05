@@ -105,7 +105,7 @@ FxClusterSrvlb.prototype.bridgeMessageConversion = function (data, handle) {
                         socket.write(str);
                         console.log('INFO::::%s bytes(%s)', Buffer.byteLength(str),socket.mode);
                         if (socket.mode == 'socket') {
-                            socket.end
+                            socket.wr
                         }
                     }
 
