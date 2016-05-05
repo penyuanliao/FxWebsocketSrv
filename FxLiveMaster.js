@@ -70,7 +70,7 @@ function createServer(opt) {
         tcp_handle.onconnection = function (err ,handle) {
 
             if (err) throw new Error("client not connect.");
-
+            
             handle.onread = onread_url_param;
             handle.readStart(); //讀header封包
             //onread_roundrobin(handle); //平均分配資源
@@ -108,12 +108,31 @@ function onread_url_param(nread, buffer) {
     var general = headers.general;
     var isBrowser = (typeof general != 'undefined');
     var mode = "";
-    mode = general[0].match('HTTP/1.1') != null ? "http" : mode;
-    mode = headers.iswebsocket  ? "ws" : mode;
+    var namespace = undefined;
+    var namespace = undefined;
+    if (general) {
+        mode = general[0].match('HTTP/1.1') != null ? "http" : mode;
+        mode = headers.iswebsocket  ? "ws" : mode;
+        namespace = general[1];
+    }else
+    {
+        mode = "socket";
+        namespace = buffer.toString('utf8');
+        namespace = namespace.replace("\0","");
+        console.log('socket - namespace - ', namespace);
+        source = namespace;
 
-    if (mode === 'ws' && isBrowser) {
+        /** switch services code start **/
+        
 
-        assign(general[1], function (worker) {
+        /** switch services code end**/
+    }
+    if ((buffer.byteLength == 0 || mode == "socket" || !headers) && !headers.swfPolicy) mode = "socket";
+    if (headers.unicodeNull != null && headers.swfPolicy && mode != 'ws') mode = "flashsocket";
+
+    if ((mode === 'ws' && isBrowser) || mode === 'socket' || mode === "flashsocket") {
+
+        assign(namespace, function (worker) {
 
             if (typeof worker === 'undefined') {
                 handle.close();
