@@ -113,7 +113,7 @@ function onread_url_param(nread, buffer) {
 
     if (mode === 'ws' && isBrowser) {
 
-        assign(namespace, function (worker) {
+        assign(general[1], function (worker) {
 
             if (typeof worker === 'undefined') {
                 handle.close();
