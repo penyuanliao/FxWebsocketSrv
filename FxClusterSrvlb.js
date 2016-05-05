@@ -217,7 +217,7 @@ function setupCluster(srv) {
         var socket = client.socket;
 
         if (_get[1] === "/") {
-            var file = path.join(__dirname, './public/views/broadwayPlayer.html');
+            var file = path.join(__dirname, '/public/views/broadwayPlayer.html');
             fs.readFile(file, function (err, data) {
                 successfulHeader(200, socket, "html");
                 socket.write(data);
