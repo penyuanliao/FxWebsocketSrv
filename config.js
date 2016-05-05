@@ -28,7 +28,7 @@ if (config.env == 'development') {
 }
 else {
     config.rtmpHostname = "192.168.188.80";//
-    config.stream_proc = "ffmpeg";
+    config.stream_proc = "ffmpegv258";
     config.srvOptions = {
         'host': '0.0.0.0',
         'port': config.appConfig.port,
@@ -41,16 +41,13 @@ else {
         'clusterNum': 7//config.numCPUs -1
     };
 }
-config.assignRule = [['daabb','daabc','daabd','daaib','daabg'], ['daace','daacf','daacde'],['daacdf','daadb','daacb'], ['daaib','daahb','daagb'], ['dabab','dabbb','daafb'], ['dabcb','dabfb','dabeb']];
+config.assignRule = [['daabb','daabc','daabd','daaib','daabg'], ['daace','daacf','daacde','daabdg'],['daabdh','daacdf','daadb','daacb'], ['daabh','daaib','daahb','daagb'], ['dabab','dabbb','daafb'], ['dabcb','dabfb','dabeb']];
 
 //if (config.assignRule.length < config.forkOptions.num) throw new Error("assignRule != forkOptions.num");
-
 config.rtmpPort = 1935;
 config.videoDomainName = config.rtmpHostname + ":" + config.rtmpPort;
 //todo define the balance
 config.balance = 'url_param';//roundrobin
-
-
 
 /**
  * Application parameters
