@@ -108,25 +108,12 @@ function onread_url_param(nread, buffer) {
     var general = headers.general;
     var isBrowser = (typeof general != 'undefined');
     var mode = "";
-    var namespace = undefined;
-    if (general) {
-        mode = general[0].match('HTTP/1.1') != null ? "http" : mode;
-        mode = headers.iswebsocket  ? "ws" : mode;
-        namespace = general[1];
-    }else
-    {
-        mode = "socket";
-        namespace = buffer.toString('utf8');
-        namespace = namespace.replace("\0","");
-        console.log('socket - namespace - ', namespace);
-        source = namespace;
-    }
-    if ((buffer.byteLength == 0 || mode == "socket" || !headers) && !headers.swfPolicy) mode = "socket";
-    if (headers.unicodeNull != null && headers.swfPolicy && mode != 'ws') mode = "flashsocket";
+    mode = general[0].match('HTTP/1.1') != null ? "http" : mode;
+    mode = headers.iswebsocket  ? "ws" : mode;
 
-    if ((mode === 'ws' && isBrowser) || mode === 'socket' || mode === "flashsocket") {
+    if (mode === 'ws' && isBrowser) {
 
-        assign(namespace, function (worker) {
+        assign(general[1], function (worker) {
 
             if (typeof worker === 'undefined') {
                 handle.close();
@@ -315,9 +302,6 @@ function socketSend(handle, spawnName) {
 /* ------- start testing logger ------- */
 /** ffmpeg stream close **/
 function swpanedClosed(code){
-
-    socketSend({'NetStatusEvent': 'NetConnect.Failed'}, this.name);
-
 
     //** 監聽到自動關閉,重新啟動 code == 0 **/
     if (1) {

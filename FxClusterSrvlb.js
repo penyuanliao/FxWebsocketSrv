@@ -104,7 +104,7 @@ FxClusterSrvlb.prototype.bridgeMessageConversion = function (data, handle) {
                         //debug('INFO::::%s bytes', Buffer.byteLength(str));
                         //!!!! cpu very busy !!!
 
-                        console.log('INFO::::%s bytes(%s)', Buffer.byteLength(str),socket.mode);
+                        //console.log('INFO::::%s bytes(%s)', Buffer.byteLength(str),socket.mode, process.env);
                         if (socket.mode == 'socket') {
                             socket.write(str+'\0');
                         }else
@@ -132,7 +132,7 @@ FxClusterSrvlb.prototype.bridgeMessageConversion = function (data, handle) {
             return;
         }
         else if (data.evt === "socketSend") {
-            socketSend(data.evt, data.spawnName);
+            socketSend(data.handle, data.spawnName);
             return;
         }
         else if (data.evt === "processInfo") {
