@@ -9,12 +9,22 @@ const cfg = require('../config.js');
 
 stream.setupCluster(cfg.forkOptions);
 
-// stream.createLiveStreams(cfg.appConfig.fileName);
-// stream.createClientStream(cfg.appConfig.fileName);
+if (!cfg.appConfig.fileName) {
+    Error('config not found fileName setting.');
+    process.exit(0);
+    return;
+}
+
+if (cfg.broadcast) {
+
+    stream.createLiveStreams(cfg.appConfig.fileName);
+}else {
+    stream.createClientStream(cfg.appConfig.fileName);
+}
 
 stream.createServer(true);
 
-stream.on('streamData', function (name,base64) {
+stream.on('streamData', function (name, base64) {
 
     stream.assign(name, function (worker) {
         if (worker) {

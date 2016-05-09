@@ -24,12 +24,12 @@ if (config.env == 'development') {
         'webCluster':'',
         'webNum':0,
         'cluster': './FxClusterSrvlb.js',
-        'clusterNum': 2,
+        'clusterNum': 2
     };
 }
 else {
     config.rtmpHostname = "192.168.188.80";//
-    config.stream_proc = "ffmpegv258";
+    config.stream_proc = "ffmpeg";
     config.srvOptions = {
         'host': '0.0.0.0',
         'port': config.appConfig.port,
@@ -40,7 +40,7 @@ else {
         'webCluster':'',
         'webNum':0,
         'cluster': './FxClusterSrvlb.js',
-        'clusterNum': 7//config.numCPUs -1
+        'clusterNum': 7 //config.numCPUs -1
     };
 }
 config.assignRule = [['daabb','daabc','daabd','daaib','daabg'], ['daace','daacf','daacde','daabdg'],['daabdh','daacdf','daadb','daacb'], ['daabh','daaib','daahb','daagb'], ['dabab','dabbb','daafb'], ['dabcb','dabfb','dabeb']];
@@ -50,6 +50,11 @@ config.rtmpPort = 1935;
 config.videoDomainName = config.rtmpHostname + ":" + config.rtmpPort;
 //todo define the balance
 config.balance = 'url_param';//roundrobin
+
+if (!config.broadcast)
+    config.broadcast = false; //ffmpeg FMS streaming vp62 format H.264 broadcast
+if (!config.liveStream)
+    config.liveStream = {host:'183.182.70.182', port:80}; // middleware - connect live streaming ip and port
 
 /**
  * Application parameters
@@ -79,7 +84,22 @@ function appParames(){
             }else {
                 config.rtmpHostname = rtmpHost;
             }
-        }
+        }else if (element === "-broadcast") {
+            console.log('-broadcast');
+            config.broadcast = true;
+        }else if (element === "-middleware") {
+            var mwInfo = process.argv[index + 1];
+            if (!mwInfo && typeof mwInfo != "undefined" && mwInfo !=0) {
+                throw "middleware Host no definition.";
+            }else {
+                if (args.toString().indexOf("-broadcast") == -1) {
+                    var arg = mwInfo.toString().split(":");
+                    config.liveStream = {host:arg[0], port: arg[1]};
+                }else {
+                    throw "warning!! The '-middleware' can be not setting has to been disabled because your set '-broadcast'.";
+                }
+            };
+        };
 
             });
 

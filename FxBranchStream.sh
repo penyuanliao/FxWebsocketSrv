@@ -22,7 +22,7 @@ else
    echo '### No such file or directory... ###'
    exit 0
 fi
-
+StreamCount=0;
 SERV_PATH=""
 for i in ${RTMP_STREAM_LIST[*]};
 do
@@ -33,12 +33,15 @@ do
       SERV_PATH="$SERV_PATH $RTMP_PATH:$RTMP_PORT${i}"
    fi
 
+   StreamCount=StreamCount+1
 done
 
-exec node ${SERV_PARAMS} ${SERV_BRANCH_FILE} -p ${SERV_PORT} -v "$RTMP_PATH" -f "$SERV_PATH" > ./${NOW}.log 2>&1 &
+node ${SERV_PARAMS} ${SERV_BRANCH_FILE} -p ${SERV_PORT} -v "$RTMP_PATH" -f "$SERV_PATH" -broadcast > ./${NOW}.log 2>&1 &
 echo " + + NodeJS Server START. + + "
 
-echo "$SERV_PATH"
+echo "+ + -broadcast Server + +"
+
+echo "Live Streaming Count:${StreamCount}";
 
 
 

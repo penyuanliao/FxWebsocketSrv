@@ -99,6 +99,9 @@ StreamServer.prototype.streamHeartbeat = function(spawned) {
     var self = this;
     const waitTime = 5000;
     const pid = spawned.ffmpeg_pid.toString();
+
+    if (!pid) {console.error('Child_process create to failure!!!')}
+
     this.doWaiting[pid]= 0;
     function todo() {
         // debug('stream(%s %s) Heartbeat wait count:%d', spawned.name, pid, doWaiting[pid]);
@@ -218,6 +221,9 @@ StreamServer.prototype.assign = function(namespace, cb) {
 //            TCP SERVER             //
 // ================================= //
 StreamServer.prototype.create = function (opt) {
+
+    var self = this;
+
     var tcp = new fxNetSocket.fxTCP();
 
     tcp.createServer(opt);
@@ -232,7 +238,7 @@ StreamServer.prototype.create = function (opt) {
                 if (typeof worker === 'undefined') {
                     handle.close();
                 }else{
-                    worker.send({'evt':'c_init',data:source}, handle,[{ track: false, process: false }]);
+                    worker.send({'evt':'c_init',data:buffer}, handle,[{ track: false, process: false }]);
                 };
 
             });
@@ -392,7 +398,7 @@ StreamServer.prototype.setupCluster = function(opt) {
             env.NODE_CDID = i;
             env.PORT = cfg.appConfig.port;
             //var cluster = proc.fork(opt.cluster,{silent:false}, {env:env});
-            var cluster = new daemon("../" + opt.cluster,{silent:false}, {env:env}); //心跳系統
+            var cluster = new daemon("" + opt.cluster,{silent:false}, {env:env}); //心跳系統
             cluster.init();
             cluster.name = 'ch_' + i;
             this.clusters.push(cluster);
@@ -473,7 +479,7 @@ StreamServer.prototype.addStreamSocket = function(host, port, namespace) {
 
     return sock;
 };
-StreamServer.prototype.createClientStream = function(fileName) {
+StreamServer.prototype.createClientStream = function(fileName, host , port) {
     var self = this;
     var sn = fileName;
     var length = sn.length;
@@ -487,8 +493,6 @@ StreamServer.prototype.createClientStream = function(fileName) {
             var socket = this.addStreamSocket('183.182.70.182',80,pathname);
             this.streamSockets.push({'socket':socket,namespace:pathname})
         }
-
-
 
     };
 };
