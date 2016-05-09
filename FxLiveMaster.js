@@ -3,7 +3,8 @@
  * --always-compact: always full gc().
  * --expose-gc: manual gc().
  */
-const debug = require('debug')('FxClusterlb'); //debug
+const debug = require('debug')('Node:LiveStream'); //debug
+debug.log = console.log.bind(console); //file log 需要下這行
 const fxNetSocket = require('fxNetSocket');
 const outputStream = fxNetSocket.stdoutStream;
 const parser = fxNetSocket.parser;
@@ -27,6 +28,7 @@ var isWorker = ('NODE_CDID' in process.env);
 var isMaster = (isWorker === false);
 var server;
 var clusters = [];
+const closeWaitTime = 5000;
 
 if (isMaster) initizatialSrv();
 
@@ -74,6 +76,10 @@ function createServer(opt) {
             handle.onread = onread_url_param;
             handle.readStart(); //讀header封包
             //onread_roundrobin(handle); //平均分配資源
+            handle.closeWaiting = setTimeout(function () {
+                debug('CLOSE_WAIT - Wait 5 sec timeout.');
+                handle.close();
+            },closeWaitTime);
         };
 
         server = tcp_handle;
@@ -100,8 +106,11 @@ function onread_url_param(nread, buffer) {
         debug('not any data, keep waiting.');
         return;
     };
+
     // Error, end of file.
     if (nread === uv.UV_EOF) { debug('error UV_EOF: unexpected end of file.'); return;}
+
+    clearTimeout(handle.closeWaiting); //socket error CLOSE_WAIT(passive close)
 
     var headers = pheaders.onReadTCPParser(buffer);
     var source = headers.source;
@@ -118,7 +127,7 @@ function onread_url_param(nread, buffer) {
         mode = "socket";
         namespace = buffer.toString('utf8');
         namespace = namespace.replace("\0","");
-        console.log('socket - namespace - ', namespace);
+        debug('["%s"]socket - namespace - %s',arguments.callee.name, namespace);
         source = namespace;
     }
     if ((buffer.byteLength == 0 || mode == "socket" || !headers) && !headers.swfPolicy) mode = "socket";
@@ -143,6 +152,11 @@ function onread_url_param(nread, buffer) {
 
         if (typeof worker === 'undefined') return;
         worker.send({'evt':'c_init',data:source}, handle,[{ track: false, process: false }]);
+    }else {
+        handle.close();
+        handle.readStop();
+        handle = null;
+        return;
     }
 
     handle.readStop();
@@ -191,7 +205,7 @@ function assign(namespace,cb) {
     if (cfg.balance === "url_param") {
         cfg.assignRule.asyncEach(function (item, resume) {
             if (item.constructor === String) {
-                console.log('string:id:', item);
+                debug('string:id:', item);
                 if (namespace.search(item) != -1) {
                     if (typeof cb !== 'undefined') {
                         if (cb) cb(clusters[num]);

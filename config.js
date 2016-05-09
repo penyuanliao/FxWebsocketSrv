@@ -17,6 +17,7 @@ if (config.env == 'development') {
     config.srvOptions = {
         'host': '0.0.0.0',
         'port': config.appConfig.port,
+        'closeWaitTime':5000, // Setting close_wait timeout
         'backlog': 511
     };
     config.forkOptions = {
@@ -32,6 +33,7 @@ else {
     config.srvOptions = {
         'host': '0.0.0.0',
         'port': config.appConfig.port,
+        'closeWaitTime':5000, // Setting close_wait timeout
         'backlog': 511
     };
     config.forkOptions = {
