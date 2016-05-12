@@ -148,7 +148,7 @@
         function createWebsocketConnect(namespace, H264Player, cb) {
 
             var quality = document.getElementById('quality').value;
-            var wsURL = 'ws://' + location.host + '/video/'+ namespace +'/' + quality + '/' ;
+            var wsURL = 'ws://' + location.host + ':3000/video/'+ namespace +'/' + quality + '/' ;
             var ws2 = new WebSocket(wsURL,'app2');
             ws2.onopen = function (e) {
                 
@@ -192,7 +192,7 @@
         function liveStream(namespace) {
             var quality = document.getElementById('quality').value;
             console.log(quality);
-            var wsURL = 'ws://' + location.host + '/video/'+ namespace +'/' + quality + '/' ;
+            var wsURL = 'ws://127.0.0.1:3000/video/'+ namespace +'/' + quality + '/' ;
             ws = new WebSocket(wsURL,'app2');
             ws.onopen = onOpenHandle;
             ws.onclose = onCloseHandle;
@@ -214,21 +214,16 @@
 
             if (json.NetStreamEvent === "NetStreamData") {
 
-                var vList = String(json.data).split(',');
-//                console.log("vList:",vList.length);
-                for (var i = 0; i < vList.length; i++) {
-
-                    if(!isInternet) {
-                        var bin = toUint8Array(vList[i]);
-                        player.decode(bin);
-                    }
-                    else
-                        player.decode(vList[i]); //IE Only
-//                decode.decode(bin);
-                    connecttd();
-                    startTime();
-
+                if(!isInternet) {
+                    var bin = toUint8Array(json.data);
+                    console.log('NetStreamData ', bin.length);
+                    player.decode(bin);
                 }
+                else
+                    player.decode(json.data); //IE Only
+//                decode.decode(bin);
+                connecttd();
+                startTime();
 
 
             }
@@ -335,10 +330,7 @@
             sub.disabled = false;
             nodes2.disabled = true;
         };
-        
-        
-        
-        
+
         var close2 = document.getElementById('close2');
         close2.disabled = true;
         close2.onclick = function (e) {

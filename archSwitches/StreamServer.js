@@ -22,9 +22,16 @@ const net  = require('net');
 const evt = require('events');
 const proc = require('child_process');
 
+// heartbeat wait time before failover triggered in a cluster.
+const heartbeatInterval = 5000;
+const heartbeatThreshold = 12;
+
 /** 多執行緒 **/
 var isWorker = ('NODE_CDID' in process.env);
 var isMaster = (isWorker === false);
+
+//roundrobin conut
+var roundrobinCount = 0;
 
 util.inherits(StreamServer,clusterConstructor);
 
@@ -67,7 +74,7 @@ StreamServer.prototype.createLiveStreams = function(fileName) {
             this.streamHeartbeat(spawned);
             spawned = null;
         }else {
-            throw "create Live Stream path error." + sn[i];
+            throw Error("create Live Stream path error." + sn[i]);
         };
     };
 
@@ -97,7 +104,7 @@ StreamServer.prototype.createLiveStreams = function(fileName) {
 /** 心跳檢查ffmpeg **/
 StreamServer.prototype.streamHeartbeat = function(spawned) {
     var self = this;
-    const waitTime = 5000;
+    const waitTime = heartbeatInterval;
     const pid = spawned.ffmpeg_pid.toString();
 
     if (!pid) {console.error('Child_process create to failure!!!')}
@@ -106,7 +113,7 @@ StreamServer.prototype.streamHeartbeat = function(spawned) {
     function todo() {
         // debug('stream(%s %s) Heartbeat wait count:%d', spawned.name, pid, doWaiting[pid]);
 
-        if (self.doWaiting[pid] >= 12) { // One minute
+        if (self.doWaiting[pid] >= heartbeatThreshold) { // One minute
             //TODO pro kill -9 pid
             proc.exec("kill -9 " + pid);
             delete self.doWaiting[pid];
@@ -148,7 +155,6 @@ StreamServer.prototype.assign = function(namespace, cb) {
     var worker = undefined;
     var num = 0;
     var self = this;
-
     if (!self.clusters) {
         return;
     }
@@ -160,7 +166,8 @@ StreamServer.prototype.assign = function(namespace, cb) {
                 console.log('string:id:', item);
                 if (namespace.search(item) != -1) {
                     if (typeof cb !== 'undefined') {
-                        if (cb) cb(self.clusters[num]);
+                        worker = self.clusters[num];
+                        if (cb) cb(worker);
                         return;
                     }
                 }
@@ -173,7 +180,8 @@ StreamServer.prototype.assign = function(namespace, cb) {
                     rule = item[i++];
                     if (namespace.search(rule) != -1) {
 
-                        if (cb) cb(self.clusters[num]);
+                        worker = self.clusters[num];
+                        if (cb) cb(worker);
                         return;
                     }
                 }
@@ -181,19 +189,21 @@ StreamServer.prototype.assign = function(namespace, cb) {
             num++;
             resume();
         }, function () {
-            debug('ERROR::not found Worker Server:', namespace);
-            if (cb) cb(undefined);
+            if (!worker || typeof worker == 'undefined')
+                debug('ERROR::not found Worker Server:', namespace);
+            console.log('complete');
+
+            if (cb) cb(worker);
         });
     }
     else if (cfg.balance === "roundrobin") {
-        num = 0;
-        if (namespace.search('daabb') != -1) worker = this.clusters[++num];
-        if (namespace.search('daabc') != -1) worker = this.clusters[++num];
-        if (namespace.search('daabd') != -1) worker = this.clusters[++num];
-        if (namespace.search('daabg') != -1) worker = this.clusters[++num];
-        if (namespace.search('daabh') != -1) worker = this.clusters[++num];
-        if (namespace.search('daabdg') != -1) worker = this.clusters[++num];
-        if (namespace.search('daabdh') != -1) worker = this.clusters[++num];
+
+        worker = this.clusters[roundrobinCount++];
+
+        if (roundrobinCount >= this.clusters.length) {
+            roundrobinCount = 0;
+        }
+
         if (cb) cb(worker);
     }else if (cfg.balance === "leastconn") {
         var cluster = this.clusters[namespace][0];
@@ -220,7 +230,7 @@ StreamServer.prototype.assign = function(namespace, cb) {
 // ================================= //
 //            TCP SERVER             //
 // ================================= //
-StreamServer.prototype.create = function (opt) {
+StreamServer.prototype.setupClusterServer2 = function (opt) {
 
     var self = this;
 
@@ -230,11 +240,11 @@ StreamServer.prototype.create = function (opt) {
 
     tcp.on('onRead', function (nread, buffer, handle) {
 
-        debug('Client to use the %s request Connections.', handle.mode)
+        debug('Client to use the %s request Connections.', handle.mode,handle.namespace);
 
         if(handle.mode == 'ws' || handle.mode == 'socket' || handle.mode == 'flashsocket') {
             self.assign(handle.namespace, function (worker) {
-
+                
                 if (typeof worker === 'undefined') {
                     handle.close();
                 }else{
@@ -245,7 +255,7 @@ StreamServer.prototype.create = function (opt) {
         }else if (handle.mode == 'http'){
             var obj = {};
             handle.getsockname(obj);
-            console.log('The client(%s:%s) try http request but Not Support HTTP procotol.',obj.address, obj.port);
+            debug('The client(%s:%s) try http request but Not Support HTTP procotol.',obj.address, obj.port);
             handle.close();
             handle = null;
         }else {
@@ -253,11 +263,11 @@ StreamServer.prototype.create = function (opt) {
             handle.close();
         }
 
-
     });
 
 }
 /**
+ *
  * 建立tcp伺服器不使用node net
  * @param opt
  */
@@ -425,12 +435,19 @@ StreamServer.prototype.createServer = function (clusterEnable) {
     this.clusterEnable = clusterEnable;
     if (this.clusterEnable) {
         // this.setupClusterServer(cfg.srvOptions);
-        this.create(cfg.srvOptions);
+        this.setupClusterServer2(cfg.srvOptions);
     }else
     {
         // todo single server
     }
 };
+/**
+ * a new connection socket of live stream
+ * @param host is specified remote address
+ * @param port is specified remote port
+ * @param namespace is specified path
+ * @returns {*|Socket}
+ */
 StreamServer.prototype.addStreamSocket = function(host, port, namespace) {
     var self = this;
     var sock = new net.Socket();
@@ -440,7 +457,7 @@ StreamServer.prototype.addStreamSocket = function(host, port, namespace) {
 
     sock.connect(port, host, onConnected);
     function onConnected() {
-        console.log('connected to %s:%s', host, port,namespace);
+        debug('connected to %s:%s', host, port,namespace);
 
         sock.write(namespace);
 
@@ -464,17 +481,16 @@ StreamServer.prototype.addStreamSocket = function(host, port, namespace) {
             sock.chunkSize -= pos;
             sock.chunkBuffer = sock.chunkBuffer.slice(pos, sock.chunkBuffer.length);
 
-            console.log('data:',data.toString('utf8'));
             var json = JSON.parse(data.toString('utf8')).data;
-            self.emit('streamData',namespace, json);
+            self.emit('streamData', namespace, json);
 
         }
     };
     function onEnd() {
-        console.log('ended.');
+        debug('ended.');
     };
     function onDrain() {
-        console.log('onDrain.');
+        debug('onDrain.');
     };
 
     return sock;
@@ -484,15 +500,16 @@ StreamServer.prototype.createClientStream = function(fileName, host , port) {
     var sn = fileName;
     var length = sn.length;
     var i, _name;
-    debug('Init createLiveStreams');
+    debug('Init createLiveStreams on %s:%s', host, port);
     for (i = 0; i < length; i++) {
 
         _name = sn[i].toString().match(/^((rtmp[s]?):\/)?\/?([^:\/\s]+)(:([^\/]*))?((\/\w+)*\/)([\w\-\.]+[^#?\s]+)(\?([^#]*))?(#(.*))?$/i);
+
         if (typeof  _name[6] != 'undefined' && typeof _name[8] != 'undefined') {
             var pathname = _name[6] + _name[8];
-            var socket = this.addStreamSocket('183.182.70.182',80,pathname);
-            this.streamSockets.push({'socket':socket,namespace:pathname})
-        }
+            var socket = this.addStreamSocket(host, port, pathname);
+            this.streamSockets.push({'socket':socket,namespace:pathname});
+        };
 
     };
 };

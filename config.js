@@ -28,7 +28,7 @@ if (config.env == 'development') {
     };
 }
 else {
-    config.rtmpHostname = "192.168.188.80";//
+    if (!config.rtmpHostname) config.rtmpHostname = "192.168.1.171";
     config.stream_proc = "ffmpeg";
     config.srvOptions = {
         'host': '0.0.0.0',
@@ -53,8 +53,8 @@ config.balance = 'url_param';//roundrobin
 
 if (!config.broadcast)
     config.broadcast = false; //ffmpeg FMS streaming vp62 format H.264 broadcast
-if (!config.liveStream)
-    config.liveStream = {host:'183.182.70.182', port:80}; // middleware - connect live streaming ip and port
+if (!config.streamSource)
+    config.streamSource = {host:'127.0.0.1', port:9527}; // middleware - connect live streaming ip and port
 
 /**
  * Application parameters
@@ -94,7 +94,7 @@ function appParames(){
             }else {
                 if (args.toString().indexOf("-broadcast") == -1) {
                     var arg = mwInfo.toString().split(":");
-                    config.liveStream = {host:arg[0], port: arg[1]};
+                    config.streamSource = {host:arg[0], port: arg[1]};
                 }else {
                     throw "warning!! The '-middleware' can be not setting has to been disabled because your set '-broadcast'.";
                 }

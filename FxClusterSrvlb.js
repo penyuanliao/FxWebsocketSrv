@@ -136,7 +136,7 @@ FxClusterSrvlb.prototype.bridgeMessageConversion = function (data, handle) {
             return;
         }
         else if (data.evt === "processInfo") {
-            process.send({"evt":"processInfo", "data": process.memoryUsage()});
+            process.send({"evt":"processInfo", "data" : {"memoryUsage":process.memoryUsage(),"connections": server.getConnections()}})
         }
 
     }else

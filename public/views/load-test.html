@@ -23,8 +23,9 @@
 
     </style>
     <script type="text/javascript" src="../js/broadway/Decoder.js"></script>
-    <script type="text/javascript" src="../js/broadway/YUVWebGLCanvas.js"></script>
+    <!--<script type="text/javascript" src="../js/broadway/YUVWebGLCanvas.js"></script>-->
     <script type="text/javascript" src="../js/broadway/Player.js"></script>
+    <script type="text/javascript" src="../js/broadway/YUVCanvas.js"></script>
 
     <script type="text/javascript" src="../js/broadway/stream.js"></script>
 </head>
@@ -182,7 +183,7 @@
         function liveStream(namespace) {
             var select = document.getElementById('quality');
             var quality = select.value;
-            var wsURL = 'ws://' + '183.182.70.184' + '/video/'+ namespace +'/' + quality + '/';
+            var wsURL = 'ws://' + '127.0.0.1:9527' + '/video/'+ namespace +'/' + quality + '/';
             ws = new WebSocket(wsURL);
             ws.onopen = onOpenHandle;
             ws.onclose = onCloseHandle;
