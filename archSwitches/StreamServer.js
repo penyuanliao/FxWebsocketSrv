@@ -178,9 +178,13 @@ StreamServer.prototype.assign = function(namespace, cb) {
                     cunt = item.length;
                 while (i < cunt) {
                     rule = item[i++];
+
                     if (namespace.search(rule) != -1) {
 
                         worker = self.clusters[num];
+
+                        console.log('work -', num, self.clusters.length);
+
                         if (cb) cb(worker);
                         return;
                     }
@@ -189,11 +193,12 @@ StreamServer.prototype.assign = function(namespace, cb) {
             num++;
             resume();
         }, function () {
-            if (!worker || typeof worker == 'undefined')
+            if (!worker || typeof worker == 'undefined'){
                 debug('ERROR::not found Worker Server:', namespace);
-            console.log('complete');
+                if (cb) cb(worker);
+            }else {
+            }
 
-            if (cb) cb(worker);
         });
     }
     else if (cfg.balance === "roundrobin") {
