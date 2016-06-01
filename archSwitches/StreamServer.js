@@ -36,6 +36,7 @@ var roundrobinCount = 0;
 util.inherits(StreamServer,clusterConstructor);
 
 function StreamServer() {
+    // StreamServer.super_.call(this);
     this.name = "StreamServer";
     this.author = "Benson.liao";
     this.connections = 0;
@@ -48,10 +49,9 @@ function StreamServer() {
     this.streamSockets = [];
 
     this.clusterEnable = false;
-
 }
 StreamServer.prototype.onMessage = function (data) {
-    StreamServer.super_.prototype.onMessage(data).apply(this,[data]);
+    StreamServer.super_.prototype.onMessage.apply(this,[data]);
 };
 // ================================= //
 //          FFMPEG STREAM            //
@@ -67,7 +67,15 @@ StreamServer.prototype.createLiveStreams = function(fileName) {
         _name = sn[i].toString().match(/^((rtmp[s]?):\/)?\/?([^:\/\s]+)(:([^\/]*))?((\/\w+)*\/)([\w\-\.]+[^#?\s]+)(\?([^#]*))?(#(.*))?$/i);
         if (typeof  _name[6] != 'undefined' && typeof _name[8] != 'undefined') {
             var pathname = _name[6] + _name[8];
-            spawned = this.liveStreams[pathname] = new outputStream(sn[i],cfg.stream_proc);
+
+            var high = (_name[8].indexOf('hd') != -1);
+            var standard = (_name[8].indexOf('sd') != -1);
+            var customParams = {
+                fps:high ? 30 : 10,
+                maxrate:( high ? "800k" : (standard ? "500k" : "300k") )
+            };
+
+            spawned = this.liveStreams[pathname] = new outputStream(sn[i],cfg.stream_proc, customParams);
             spawned.name = pathname;
             spawned.on('streamData', swpanedUpdate);
             spawned.on('close', swpanedClosed);
@@ -183,7 +191,7 @@ StreamServer.prototype.assign = function(namespace, cb) {
 
                         worker = self.clusters[num];
 
-                        console.log('work -', num, self.clusters.length);
+                        // console.log('work -', num, self.clusters.length);
 
                         if (cb) cb(worker);
                         return;
