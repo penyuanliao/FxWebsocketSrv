@@ -11,6 +11,8 @@ configfile="./configfile/config.cfg";
 
 NOW=$(date +"%Y%m%d");
 
+NODE_PATH="node"
+
 export NODE_ENV='';
 export DEBUG_FD=3;
 export DEBUG="";
@@ -45,10 +47,10 @@ echo " + + NodeJS Server START. + + "
 if [ "$service" == "y" ]
     then
         echo "+ + -broadcast Server + +"
-        exec node ${SERV_PARAMS} ${SERV_BRANCH_FILE} -p ${SERV_PORT} -f "$SERV_PATH" -broadcast > "./${NOW}_broadcast.log" 2>&1 &
+        ${NODE_PATH} ${SERV_PARAMS} ${SERV_BRANCH_FILE} -p ${SERV_PORT} -f "$SERV_PATH" -broadcast > "./${NOW}_broadcast.log" 2>&1 &
     else
         echo "+ + -middleware Server + +"
-        exec node ${SERV_PARAMS} ${SERV_BRANCH_FILE} -p ${SERV_PORT} -f "$SERV_PATH" -middleware "$BRANCH_SOURCE_URL" > "./${NOW}_middleware.log" 2>&1 &
+        ${NODE_PATH} ${SERV_PARAMS} ${SERV_BRANCH_FILE} -p ${SERV_PORT} -f "$SERV_PATH" -middleware "$BRANCH_SOURCE_URL" > "./${NOW}_middleware.log" 2>&1 &
 fi
 
 echo " + Live Streaming connection connection: ${StreamCount}";
