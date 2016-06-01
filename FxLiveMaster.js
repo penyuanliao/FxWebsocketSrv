@@ -28,6 +28,7 @@ var isWorker = ('NODE_CDID' in process.env);
 var isMaster = (isWorker === false);
 var server;
 var clusters = [];
+var roundrobinCount = 0;
 const closeWaitTime = 5000;
 
 if (isMaster) initizatialSrv();
@@ -39,6 +40,8 @@ function initizatialSrv() {
     //setInterval(observerTotoalUseMem, 60000); // testing code 1.0 min
 
     utilities.autoReleaseGC(); //** 手動 1 sec gc
+
+
 
     // 1. setup child process fork
     setupCluster(cfg.forkOptions);
@@ -99,8 +102,8 @@ function onread_roundrobin(client_handle) {
 /** reload request header and assign **/
 function onread_url_param(nread, buffer) {
     var handle = this;
-    // nread > 0 read success
-    if (nread < 0) return;
+
+    if (nread < 0) return; // nread > 0 read success
 
     if (nread === 0) {
         debug('not any data, keep waiting.');
@@ -196,11 +199,10 @@ function setupCluster(opt) {
  */
 function assign(namespace,cb) {
     var worker = undefined;
-
+    var num = 0;
     var maximum = clusters.length-1;
     var stremNum = cfg.appConfig.fileName.length;
     var avg = parseInt(maximum / stremNum);
-    var num = 0;
 // url_param
     if (cfg.balance === "url_param") {
         cfg.assignRule.asyncEach(function (item, resume) {
@@ -233,14 +235,13 @@ function assign(namespace,cb) {
         });
     }
     else if (cfg.balance === "roundrobin") {
-        num = 0;
-        if (namespace.search('daabb') != -1) worker = clusters[++num];
-        if (namespace.search('daabc') != -1) worker = clusters[++num];
-        if (namespace.search('daabd') != -1) worker = clusters[++num];
-        if (namespace.search('daabg') != -1) worker = clusters[++num];
-        if (namespace.search('daabh') != -1) worker = clusters[++num];
-        if (namespace.search('daabdg') != -1) worker = clusters[++num];
-        if (namespace.search('daabdh') != -1) worker = clusters[++num];
+
+        worker = clusters[roundrobinCount++];
+
+        if (roundrobinCount >= clusters.length) {
+            roundrobinCount = 0;
+        }
+
         if (cb) cb(worker);
     }
 }
@@ -258,7 +259,15 @@ function createLiveStreams(fileName) {
         _name = sn[i].toString().match(/^((rtmp[s]?):\/)?\/?([^:\/\s]+)(:([^\/]*))?((\/\w+)*\/)([\w\-\.]+[^#?\s]+)(\?([^#]*))?(#(.*))?$/i);
         if (typeof  _name[6] != 'undefined' && typeof _name[8] != 'undefined') {
             var pathname = _name[6] + _name[8];
-            spawned = liveStreams[pathname] = new outputStream(sn[i],cfg.stream_proc);
+
+            var high = (_name[8].indexOf('hd') != -1);
+            var standard = (_name[8].indexOf('sd') != -1);
+            var customParams = {
+                fps:high ? 30 : 10,
+                maxrate:( high ? "800k" : (standard ? "500k" : "300k") )
+            };
+
+            spawned = liveStreams[pathname] = new outputStream(sn[i],cfg.stream_proc, customParams);
             spawned.name = pathname;
             spawned.on('streamData', swpanedUpdate);
             spawned.on('close', swpanedClosed);
@@ -307,11 +316,26 @@ function rebootStream(spawned,skip) {
 function swpanedUpdate(base64) {
     doWaiting[this.ffmpeg_pid] = 0;
     var spawnName = this.name;
-    assign(spawnName, function (worker) {
-        if (worker) {
-            worker.send({'evt':'streamData','namespace':spawnName,'data':base64});
+
+    if (cfg.balance === "roundrobin") {
+
+        for (var i = 0; i < clusters.length; i++) {
+            var cluster = clusters[i];
+            if (cluster) {
+                cluster.send({'evt':'streamData','namespace':spawnName,'data':base64});
+            }else {
+                throw Error("The cluster(assigned to " + spawnName + ") was not found on this Server.");
+            }
         }
-    });
+        
+
+    }else {
+        assign(spawnName, function (worker) {
+            if (worker) {
+                worker.send({'evt':'streamData','namespace':spawnName,'data':base64});
+            }
+        });
+    }
 
 };
 

@@ -165,8 +165,15 @@ function createLiveStreams(fileName) {
         _name = sn[i].toString().match(/^((rtmp[s]?):\/)?\/?([^:\/\s]+)(:([^\/]*))?((\/\w+)*\/)([\w\-\.]+[^#?\s]+)(\?([^#]*))?(#(.*))?$/i);
         if (typeof  _name[6] != 'undefined' && typeof _name[8] != 'undefined') {
             var pathname = _name[6] + _name[8];
-            console.log(sn[i]);
-            spawned = liveStreams[pathname] = new outputStream(sn[i]);
+
+            var high = (_name[8].indexOf('hd') != -1);
+            var standard = (_name[8].indexOf('sd') != -1);
+            var customParams = {
+                fps:high ? 30 : 10,
+                maxrate:( high ? "800k" : (standard ? "500k" : "300k") )
+            };
+
+            spawned = liveStreams[pathname] = new outputStream(sn[i],cfg.stream_proc, customParams);
             spawned.name = pathname;
             spawned.on('streamData', swpanedUpdate);
             spawned.on('close', swpanedClosed);
