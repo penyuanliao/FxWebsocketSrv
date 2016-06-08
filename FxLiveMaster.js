@@ -13,13 +13,14 @@ const utilities = fxNetSocket.utilities;
 const logger = fxNetSocket.logger;
 const daemon = fxNetSocket.daemon;
 /** 建立連線 **/
-const TCP = process.binding("tcp_wrap").TCP;
-const uv = process.binding('uv');
-const fs  = require('fs');
+const TCP  = process.binding("tcp_wrap").TCP;
+const uv   = process.binding('uv');
+const fs   = require('fs');
 const net  = require('net');
-const evt = require('events');
-const cfg = require('./config.js');
+const evt  = require('events');
+const cfg  = require('./config.js');
 const proc = require('child_process');
+const v8   = require('v8');
 /** 所有視訊stream物件 **/
 var liveStreams = {};
 var doWaiting = []; //心跳系統等待次數紀錄
@@ -40,8 +41,6 @@ function initizatialSrv() {
     //setInterval(observerTotoalUseMem, 60000); // testing code 1.0 min
 
     utilities.autoReleaseGC(); //** 手動 1 sec gc
-
-
 
     // 1. setup child process fork
     setupCluster(cfg.forkOptions);
@@ -188,8 +187,8 @@ function setupCluster(opt) {
             cluster.init();
             cluster.name = 'ch_' + i;
             clusters.push(cluster);
-        };
-    };
+        }
+    }
     /** cluster end - isMaster **/
 }
 /**
@@ -197,7 +196,7 @@ function setupCluster(opt) {
  * @param namespace
  * @returns {undefined}
  */
-function assign(namespace,cb) {
+function assign(namespace, cb) {
     var worker = undefined;
     var num = 0;
     var maximum = clusters.length-1;
@@ -280,7 +279,6 @@ function createLiveStreams(fileName) {
 };
 
 /** 心跳檢查ffmpeg **/
-
 function streamHeartbeat(spawned) {
     const waitTime = 5000;
     const pid = spawned.ffmpeg_pid.toString();
@@ -299,7 +297,6 @@ function streamHeartbeat(spawned) {
     }
     spawned.lookout = setTimeout(todo,waitTime);
 }
-
 
 /** 重啟stream **/
 function rebootStream(spawned,skip) {
@@ -382,7 +379,7 @@ process.on('uncaughtException', function (err) {
 });
 
 process.on("exit", function () {
-    console.log("Main Thread exit.");
+    process.stdout.write("Main Thread exit.\n");
     var n = clusters.length;
     while (n-- > 0) {
         clusters[n].stop();
@@ -390,7 +387,7 @@ process.on("exit", function () {
 
 });
 process.on("SIGQUIT", function () {
-    console.log("user quit node process");
+    process.stdout.write("user quit node process\n");
     while (n-- > 0) {
         clusters[n].stop();
     };

@@ -43,6 +43,7 @@ else {
         'clusterNum': 7 //config.numCPUs -1
     };
 }
+
 config.assignRule = [['daabb','daabc','daabd','daaib','daabg'], ['daace','daacf','daacde','daabdg'],['daabdh','daacdf','daadb','daacb'], ['daabh','daaib','daahb','daagb'], ['dabab','dabbb','daafb'], ['dabcb','dabfb','dabeb']];
 
 //if (config.assignRule.length < config.forkOptions.num) throw new Error("assignRule != forkOptions.num");
@@ -85,7 +86,7 @@ function appParames(){
                 config.rtmpHostname = rtmpHost;
             }
         }else if (element === "-broadcast") {
-            console.log('-broadcast');
+            console.log('config -broadcast');
             config.broadcast = true;
         }else if (element === "-middleware") {
             var mwInfo = process.argv[index + 1];

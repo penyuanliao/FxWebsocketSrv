@@ -75,7 +75,7 @@ FxClusterSrvlb.prototype.bridgeMessageConversion = function (data, handle) {
 
             socket.fd = handle.fd;
             socket.setTimeout(1000, function () {
-                console.log(String(socket.remoteAddress).split(":")[3], socket.remotePort);
+                process.stdout.write(String(socket.remoteAddress).split(":")[3] + socket.remotePort +'\n');
             });
             socket.readable = true;
             socket.writable = true;
@@ -93,7 +93,7 @@ FxClusterSrvlb.prototype.bridgeMessageConversion = function (data, handle) {
             var keys = Object.keys(clients);
             if (count != keys.length) {
                 count = keys.length;
-                console.log('clients.count.', keys.length);
+                process.stdout.write('clients.count:' + keys.length + '\n');
             }
             if (keys.length == 0) return;
             for (var i = 0; i < keys.length; i++) {
@@ -141,7 +141,7 @@ FxClusterSrvlb.prototype.bridgeMessageConversion = function (data, handle) {
 
     }else
     {
-        console.log('out of hand. dismiss message');
+        process.stdout.write('out of hand. dismiss message.\n');
     }
 };
 FxClusterSrvlb.prototype.removeAllEvent = function () {
@@ -178,8 +178,6 @@ function setupCluster(srv) {
 
         try {
             var json = JSON.parse(evt.data);
-
-            console.log(json.NetStreamEvent === 'getConnections');
 
             if (json.NetStreamEvent === 'getConnections') {
                 evt.client.write(JSON.stringify({"NetStreamEvent":"getConnections","data":srv.getConnections()}));
@@ -261,7 +259,7 @@ function setupCluster(srv) {
 
                 fsstream.pipe(socket);
             });
-            console.log('client:',typeof socket === 'undefined' , _get[1]);
+            process.stdout.write('client:' + typeof socket === 'undefined' + _get[1] + '\n');
             fsstream.on('data', function (chunk) {
                 fileLength += chunk.length;
 

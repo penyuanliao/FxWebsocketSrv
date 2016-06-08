@@ -21,7 +21,6 @@ const fs  = require('fs');
 const net  = require('net');
 const evt = require('events');
 const proc = require('child_process');
-
 // heartbeat wait time before failover triggered in a cluster.
 const heartbeatInterval = 5000;
 const heartbeatThreshold = 12;
@@ -49,7 +48,8 @@ function StreamServer() {
     this.streamSockets = [];
 
     this.clusterEnable = false;
-}
+
+};
 StreamServer.prototype.onMessage = function (data) {
     StreamServer.super_.prototype.onMessage.apply(this,[data]);
 };
@@ -266,6 +266,14 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
 
             });
         }else if (handle.mode == 'http'){
+
+            if (!cfg.broadcast) {
+                var worker = self.clusters[0];
+
+                if (typeof worker === 'undefined') return;
+                worker.send({'evt':'c_init',data:buffer}, handle,[{ track: false, process: false }]);
+                return;
+            }
             var obj = {};
             handle.getsockname(obj);
             debug('The client(%s:%s) try http request but Not Support HTTP procotol.',obj.address, obj.port);
