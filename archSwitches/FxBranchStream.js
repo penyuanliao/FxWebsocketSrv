@@ -29,7 +29,7 @@ stream.on('streamData', function (name, base64) {
 
     if (cfg.balance === "roundrobin") {
         for (var i = 0; i < stream.clusters.length; i++) {
-            var cluster = stream.clusters[i];
+            var cluster = stream.clusters[i][0];
             if (cluster) {
                 cluster.send({'evt':'streamData','namespace':name,'data':base64});
             }else {

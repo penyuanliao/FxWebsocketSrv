@@ -3,27 +3,39 @@
  * --always-compact: always full gc().
  * --expose-gc: manual gc().
  */
-const debug = require('debug')('Node:StreamServer'); //debug
-const fxNetSocket = require('fxNetSocket');
+const debug              = require('debug')('Node:StreamServer'); //debug
+const path               = require('path');
+const util               = require('util');
+const fs                 = require('fs');
+const fxNetSocket        = require('fxNetSocket');
 const clusterConstructor = fxNetSocket.clusterConstructor;
-const outputStream = fxNetSocket.stdoutStream;
-const parser = fxNetSocket.parser;
-const pheaders = parser.headers;
-const utilities = fxNetSocket.utilities;
-const logger = fxNetSocket.logger;
-const daemon = fxNetSocket.daemon;
-const cfg = require('../config.js');
-const util = require('util');
+const outputStream       = fxNetSocket.stdoutStream;
+const parser             = fxNetSocket.parser;
+const pheaders           = parser.headers;
+const utilities          = fxNetSocket.utilities;
+const daemon             = fxNetSocket.daemon;
+const NSLog              = fxNetSocket.logger.getInstance();
+console.log(path.dirname(__dirname));
+NSLog.configure({logFileEnabled:true, level:'info', dateFormat:'[yyyy-MM-dd hh:mm:ss]',filePath:path.dirname(__dirname)+"/historyLog", maximumFileSize: 1024 * 1024 * 100});
+var cfg = require('../config.js');
+var IPSec;
+var secPath = path.dirname(__dirname) + "/configfile/SecurityProfile.json";
+fs.readFile(secPath, 'utf8', function (err, data) {
+    if (err) throw err; // we'll not consider error handling for now
+    IPSec = JSON.parse(data);
+});
+const owner = require('./socketOwner.js');
 /** 建立連線 **/
 const TCP = process.binding("tcp_wrap").TCP;
 const uv = process.binding('uv');
-const fs  = require('fs');
-const net  = require('net');
+const net = require('net');
 const evt = require('events');
 const proc = require('child_process');
 // heartbeat wait time before failover triggered in a cluster.
 const heartbeatInterval = 5000;
 const heartbeatThreshold = 12;
+const adminProtocol = 'admin';
+
 
 /** 多執行緒 **/
 var isWorker = ('NODE_CDID' in process.env);
@@ -38,17 +50,27 @@ function StreamServer() {
     // StreamServer.super_.call(this);
     this.name = "StreamServer";
     this.author = "Benson.liao";
-    this.connections = 0;
-    this.initProcessEvent();
+    this.connections = 0; //連線數量
+    this.initProcessEvent(); //初始化process事件
     /** 所有視訊stream物件 **/
     this.liveStreams = {};
-    this.doWaiting = []; //心跳系統等待次數紀錄
-    this.server;
+    /** 心跳系統等待次數紀錄 **/
+    this.doWaiting = [];
+    this.server; // TCP server listen
+    /** 子程序物件 **/
     this.clusters = [];
+    /** 橋接層連線socket物件 **/
     this.streamSockets = [];
-
+    /** 管理層socket物件 **/
+    this.owners = [];
+    /**開啟管理連線**/
+    this.ownersEnabled = false;
+    /** 廣播層還是橋接層 **/
     this.clusterEnable = false;
-
+    // this.vp6fStream();
+    /** 橋接層是否開啟網頁測試 **/
+    cfg.httpEnabled = true;
+    utilities.autoReleaseGC();
 };
 StreamServer.prototype.onMessage = function (data) {
     StreamServer.super_.prototype.onMessage.apply(this,[data]);
@@ -97,11 +119,11 @@ StreamServer.prototype.createLiveStreams = function(fileName) {
     /** ffmpeg stream close **/
     function swpanedClosed(code){
 
-        self.socketSend({'NetStatusEvent': 'NetConnect.Failed'}, this.name);
+        //self.socketSend({'NetStatusEvent': 'NetConnect.Failed'}, this.name);
 
         //** 監聽到自動關閉,重新啟動 code == 0 **/
         if (1) {
-            debug("listen swpaned Closed - ",this.name, " < REBOOTING >");
+            console.error("listen swpaned Closed - ",this.name, " < REBOOTING >");
             self.rebootStream(this,true);
         }
 
@@ -119,7 +141,7 @@ StreamServer.prototype.streamHeartbeat = function(spawned) {
 
     this.doWaiting[pid]= 0;
     function todo() {
-        // debug('stream(%s %s) Heartbeat wait count:%d', spawned.name, pid, doWaiting[pid]);
+        debug('stream(%s %s) Heartbeat wait count:%d', spawned.name, pid, self.doWaiting[pid]);
 
         if (self.doWaiting[pid] >= heartbeatThreshold) { // One minute
             //TODO pro kill -9 pid
@@ -127,11 +149,11 @@ StreamServer.prototype.streamHeartbeat = function(spawned) {
             delete self.doWaiting[pid];
         }else {
             self.doWaiting[pid]++;
-            spawned.lookout = setTimeout(todo,waitTime);
+            spawned.lookout = setTimeout(todo, waitTime);
         }
     }
     spawned.lookout = setTimeout(todo,waitTime);
-}
+};
 
 /** 重啟stream **/
 StreamServer.prototype.rebootStream = function(spawned,skip) {
@@ -147,7 +169,7 @@ StreamServer.prototype.socketSend = function(handle, spawnName) {
 
     for (var i = 0; i < this.clusters.length; i++) {
         if (this.clusters[i]) {
-            this.clusters[i].send({'handle':handle,'evt':'socketSend','spawnName':spawnName});
+            this.clusters[i][0].send({'handle':handle,'evt':'socketSend','spawnName':spawnName});
         }
 
     }
@@ -174,7 +196,7 @@ StreamServer.prototype.assign = function(namespace, cb) {
                 console.log('string:id:', item);
                 if (namespace.search(item) != -1) {
                     if (typeof cb !== 'undefined') {
-                        worker = self.clusters[num];
+                        worker = self.clusters[num][0];
                         if (cb) cb(worker);
                         return;
                     }
@@ -189,7 +211,7 @@ StreamServer.prototype.assign = function(namespace, cb) {
 
                     if (namespace.search(rule) != -1) {
 
-                        worker = self.clusters[num];
+                        worker = self.clusters[num][0];
 
                         // console.log('work -', num, self.clusters.length);
 
@@ -211,7 +233,7 @@ StreamServer.prototype.assign = function(namespace, cb) {
     }
     else if (cfg.balance === "roundrobin") {
 
-        worker = this.clusters[roundrobinCount++];
+        worker = this.clusters[roundrobinCount++][0];
 
         if (roundrobinCount >= this.clusters.length) {
             roundrobinCount = 0;
@@ -219,7 +241,7 @@ StreamServer.prototype.assign = function(namespace, cb) {
 
         if (cb) cb(worker);
     }else if (cfg.balance === "leastconn") {
-        var cluster = this.clusters[namespace][0];
+        var cluster = this.clusters[0][0];
 
         if (!cluster) {
             console.error('Error not found Cluster server');
@@ -229,8 +251,8 @@ StreamServer.prototype.assign = function(namespace, cb) {
         var stremNum = cluster.length;
         for (var n = 0; n < stremNum; n++) {
             //檢查最小連線數
-            if (cluster.nodeInfo.connections < clusters[namespace][n].nodeInfo.connections){
-                cluster = clusters[namespace][n];
+            if (cluster.nodeInfo.connections < clusters[n][0].nodeInfo.connections){
+                cluster = clusters[n][0];
             }
         }
         if (cb) cb(cluster);
@@ -253,34 +275,56 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
 
     tcp.on('onRead', function (nread, buffer, handle) {
 
-        debug('Client to use the %s request Connections.', handle.mode,handle.namespace);
+        var remoteInfo = {};
+        handle.getsockname(remoteInfo);
+
+        debug('Client to use the %s request Connections.', handle.mode ,handle.namespace);
+
+        if (handle.wsProtocol == adminProtocol && self.ownersEnabled) {
+            self.initSocket(handle, buffer);
+            return;
+        }
 
         if(handle.mode == 'ws' || handle.mode == 'socket' || handle.mode == 'flashsocket') {
+
+            //TODO fms vp6f sample
+            console.log("handle.namespace : ",handle.namespace);
+            //過濾不明的namesapce
+            if (handle.namespace.substr(0,1) != "/") {
+                handle.close();
+                handle = null;
+            };
+
+            if (handle.namespace === "/video/vp6f/video0/") {
+                self.clusters[0][0].send({'evt':'c_init',data:buffer}, handle,[{ track: false, process: false }]);
+                return;
+            }
+
             self.assign(handle.namespace, function (worker) {
                 
                 if (typeof worker === 'undefined') {
                     handle.close();
+                    handle = null;
                 }else{
                     worker.send({'evt':'c_init',data:buffer}, handle,[{ track: false, process: false }]);
                 };
 
             });
-        }else if (handle.mode == 'http'){
+        }else if (handle.mode == 'http' && cfg.httpEnabled){
 
             if (!cfg.broadcast) {
-                var worker = self.clusters[0];
+                var worker = self.clusters[0][0];
 
                 if (typeof worker === 'undefined') return;
                 worker.send({'evt':'c_init',data:buffer}, handle,[{ track: false, process: false }]);
                 return;
             }
-            var obj = {};
-            handle.getsockname(obj);
-            debug('The client(%s:%s) try http request but Not Support HTTP procotol.',obj.address, obj.port);
+
+            debug('The client(%s:%s) try http request but Not Support HTTP procotol.',remoteInfo.address, remoteInfo.port);
             handle.close();
             handle = null;
         }else {
-            console.error('Not found client to use the %s request Connections!!');
+            console.error('Not found client to use the %s request Connections!!', remoteInfo.address);
             handle.close();
         }
 
@@ -387,7 +431,7 @@ StreamServer.prototype.setupClusterServer = function(opt) {
 
         }else if(mode === 'http' && isBrowser)
         {
-            var worker = self.clusters[0];
+            var worker = self.clusters[0][0];
 
             if (typeof worker === 'undefined') return;
             worker.send({'evt':'c_init',data:source}, handle,[{ track: false, process: false }]);
@@ -431,11 +475,27 @@ StreamServer.prototype.setupCluster = function(opt) {
             //var cluster = proc.fork(opt.cluster,{silent:false}, {env:env});
             var cluster = new daemon("" + opt.cluster,{silent:false}, {env:env}); //心跳系統
             cluster.init();
-            cluster.name = 'ch_' + i;
-            this.clusters.push(cluster);
+            cluster.name = 'channel_' + i;
+            if (!this.clusters[i]) {
+                this.clusters[i] = [];
+            }
+            this.clusters[i].push(cluster);
         };
     };
     /** cluster end - isMaster **/
+};
+StreamServer.prototype.initCluster = function(opt,id) {
+
+    var env = process.env;
+    env.NODE_CDID = (typeof id == 'undefined') ? this.clusters.length : id;
+    env.PORT = cfg.appConfig.port;
+    var cluster = new daemon(opt.cluster,{silent:false}, {env:env});
+    cluster.init();
+    cluster.name = 'channel_' + env.NODE_CDID;
+    if (!this.clusters[i]) {
+        this.clusters[i] = [];
+    }
+    this.clusters[i][0] = cluster;
 };
 
 StreamServer.prototype.setupSingleServer = function () {
@@ -443,13 +503,23 @@ StreamServer.prototype.setupSingleServer = function () {
     srv.on('connection', function (socket) {
         debug('clients:',socket.name);
     });
-}
+};
 
 // ================================= //
 //        Client Connections         //
 // ================================= //
-StreamServer.prototype.initSocket = function (handle) {
-    //todo new socket
+StreamServer.prototype.initSocket = function (handle, buf) {
+    //TODO Create Amini Socket
+    var self = this;
+    var sockOwner = new owner(handle, buf, this);
+    var out = {};
+    handle.getpeername(out);
+    var key = out.address + ":" + out.port;
+    sockOwner.name = key;
+    this.owners[key] = sockOwner;
+    sockOwner.on('close', function () {
+        delete self.owners[key];
+    });
 };
 
 StreamServer.prototype.createServer = function (clusterEnable) {
@@ -462,6 +532,11 @@ StreamServer.prototype.createServer = function (clusterEnable) {
         // todo single server
     }
 };
+
+// ================================= //
+//   Connected Broadcast Server      //
+// ================================= //
+
 /**
  * a new connection socket of live stream
  * @param host is specified remote address
@@ -470,52 +545,168 @@ StreamServer.prototype.createServer = function (clusterEnable) {
  * @returns {*|Socket}
  */
 StreamServer.prototype.addStreamSocket = function(host, port, namespace) {
+
     var self = this;
-    var sock = new net.Socket();
-    sock.namespace = namespace;
-    sock.chunkSize = 0;
-    sock.chunkBuffer = undefined;
-
-    sock.connect(port, host, onConnected);
-    function onConnected() {
-        debug('connected to %s:%s', host, port,namespace);
-
-        sock.write(namespace);
-
-        sock.on('data',onData);
-        sock.on('end', onEnd);
-        sock.on('drain', onDrain);
-
-    };
-    function onData(chunk) {
-        if (!sock.chunkBuffer) {
-            sock.chunkBuffer = new Buffer(chunk);
-        }else {
-            sock.chunkBuffer = Buffer.concat([sock.chunkBuffer, chunk], sock.chunkBuffer.length + chunk.length);
-        }
-        sock.chunkSize += chunk.length;
-
-        var pos = sock.chunkBuffer.indexOf('\u0000');
-        if (pos != -1) {
-            var data = sock.chunkBuffer.slice(0, pos);
-            pos++;//含/0
-            sock.chunkSize -= pos;
-            sock.chunkBuffer = sock.chunkBuffer.slice(pos, sock.chunkBuffer.length);
-
-            var json = JSON.parse(data.toString('utf8')).data;
-            self.emit('streamData', namespace, json);
-
-        }
-    };
-    function onEnd() {
-        debug('ended.');
-    };
-    function onDrain() {
-        debug('onDrain.');
-    };
+    var sock = new socketClient( host, port, namespace, function (data) {
+        self.emit('streamData', namespace, data);
+    });
 
     return sock;
 };
+
+function socketClient(host, port, namespace, cb) {
+    this.toBufferData = true;
+    this.isRetry = false;
+    this.trytimeoutObj = 0;
+    this.try_conut = 0;
+    this.host = host;
+    this.port = port;
+    this.namespace = namespace;
+    this.cb = cb;
+    this.init(host,port, namespace);
+    var self = this;
+    setTimeout(function () {
+        self.socket.destroy();
+    },5000);
+}
+
+socketClient.prototype = {
+    init: function (host, port, namespace) {
+        var waitTime = heartbeatInterval;
+        var self = this;
+        var sock = new net.Socket();
+        sock.namespace = namespace;
+        sock.chunkSize = 0;
+        sock.chunkBuffer = undefined;
+        sock.lookout = 0;
+        sock.doWaiting = 0;
+
+        sock.on('connect',onConnected);
+        sock.on('data',onData);
+        sock.on('end', onEnd);
+        sock.on('drain',onDrain);
+        sock.on('close',onClose);
+        sock.on('error', onError);
+        sock.connect(port, host);
+        socketHeartbeat(sock);
+        this.socket = sock;
+        // socketHeartbeat(sock);
+        function onConnected() {
+            console.log('connected to %s:%s', host, port,namespace);
+
+            sock.write(namespace);
+
+
+        };
+        function onData(chunk) {
+            sock.doWaiting = 0;
+            if (!sock.chunkBuffer) {
+                sock.chunkBuffer = new Buffer(chunk);
+            }else {
+                sock.chunkBuffer = Buffer.concat([sock.chunkBuffer, chunk], sock.chunkBuffer.length + chunk.length);
+            }
+            sock.chunkSize += chunk.length;
+
+            var pos = sock.chunkBuffer.indexOf('\u0000');
+            if (pos != -1) {
+                var data = sock.chunkBuffer.slice(0, pos);
+
+                pos++;//含/0
+                sock.chunkSize -= pos;
+                sock.chunkBuffer = sock.chunkBuffer.slice(pos, sock.chunkBuffer.length);
+
+                if (data.length <= 0) return;
+
+                if (self.toBufferData) {
+                    if (self.cb) self.cb(data);
+                }else {
+                    try {
+                        var json = JSON.parse(data.toString('utf8'));
+                        if (json.NetStreamEvent == "NetStreamData") {
+                            if (self.cb) self.cb(data);
+                        }
+
+                    }
+                    catch (e) {
+                        console.log(data.length);
+                    }
+                }
+
+
+                // self.emit('streamData', namespace, data.toString('utf8'));
+
+            }
+        };
+        function onEnd() {
+            debug('ended.');
+        };
+        function onDrain() {
+            debug('onDrain.');
+        };
+        function onClose() {
+            self.tryAgainLater();
+
+        }
+        function onError(err) {
+
+            NSLog.log('info','socket(%s) %s', self.namespace, err);
+            sock.destroy();
+        }
+        function socketHeartbeat(_socket) {
+            function todo() {
+
+                NSLog.log('trace','heartbeat %s:', _socket.namespace, _socket.doWaiting);
+
+                if (_socket.doWaiting >= 6 ) {
+                    NSLog.log('info' ,'The Socket connect is not responding to client.It need to be reconnect.');
+                    _socket.destroy();
+                    _socket.doWaiting = 0;
+                }else {
+                    _socket.doWaiting++;
+                    _socket.lookout = setTimeout(todo, waitTime)
+                }
+            }
+
+            _socket.lookout = setTimeout(todo, waitTime);
+        }
+
+    },
+    tryAgainLater:function () {
+        var self = this;
+        NSLog.log('trace','Connect Stream %s to try again.', self.namespace);
+
+        if (self.trytimeoutObj != 0) clearTimeout(self.trytimeoutObj);
+        self.trytimeoutObj = setTimeout(function () {
+            self.reconnect();
+
+        },10000);
+
+        if (self.try_conut >= 360) {
+            clearTimeout(self.trytimeoutObj);
+            self.trytimeoutObj = 0;
+        }
+    },
+    dealloc: function () {
+        this.socket.chunkSize = 0;
+        delete this.socket.chunkBuffer;
+        this.socket.chunkBuffer = null;
+        clearTimeout(this.socket.lookout);
+        clearTimeout(this.trytimeoutObj);
+        this.socket = null;
+    },
+    reconnect: function () {
+        this.socket.chunkSize = 0;
+        delete this.socket.chunkBuffer;
+        this.socket.chunkBuffer = null;
+        clearTimeout(this.socket.lookout);
+        clearTimeout(this.trytimeoutObj);
+        this.try_conut++;
+        this.socket = null;
+        this.init(this.host, this.port, this.namespace);
+    }
+
+}
+
 StreamServer.prototype.createClientStream = function(fileName, host , port) {
     var self = this;
     var sn = fileName;
@@ -534,7 +725,58 @@ StreamServer.prototype.createClientStream = function(fileName, host , port) {
 
     };
 };
+StreamServer.prototype.__defineSetter__('httpEnabled', function (enabled) {
+   if (typeof enabled == "boolean") {
+       cfg.httpEnabled = enabled;
 
+   }
+});
+StreamServer.prototype.__defineSetter__('loadBalance', function (mode) {
+
+    if (typeof mode === 'undefined' || mode == "" || mode == null) return;
+
+    if (mode == "url_param") {
+        cfg.balance = "url_param";
+    }else if (mode.toLowerCase() == "roundrobin") {
+        cfg.balance = "roundrobin";
+    }else if (mode == "leastconn") {
+        cfg.balance = "leastconn";
+    }
+});
+StreamServer.prototype.clusterRestart = function (id) {
+    if (this.clusters[id][0]) {
+        this.clusters[id][0].restart();
+    }else {
+        this.initCluster(cfg.srvOptions.cluster, id);
+    }
+};
+StreamServer.prototype.clusterConnections = function () {
+    var list = [];
+    for (var i = 0; i < this.clusters.length; i++) {
+        var obj = this.clusters[i][0].nodeInfo.connections;
+        list.push(obj);
+    }
+    return list;
+};
+StreamServer.prototype.ffmpegRestart = function (name) {
+    if (this.liveStreams[name]) {
+        const pid = this.liveStreams[name].ffmpeg_pid.toString();
+        proc.exec("kill -9 " + pid);
+        delete self.doWaiting[pid];
+    }else {
+
+    }
+};
+//sample
+// StreamServer.prototype.vp6fStream = function() {
+//     var self = this;
+//     var vp6f = require('../vp6f/libvp62Cl.js');
+//     this.libVP6f = new vp6f();
+//     this.libVP6f.on("videoData", function (obj) {
+//         // console.log('videoData:', obj.data.length);
+//         self.clusters[0].send({'evt':'streamData','namespace':'/video/vp6f/video0/','data':obj.data.toString('base64')});
+//     });
+// };
 
 module.exports = StreamServer;
 

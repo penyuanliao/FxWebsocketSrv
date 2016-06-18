@@ -35,6 +35,8 @@ FxClusterSrvlb.prototype.setupIPCBridge = function () {
 
     info("setup ipc bridge connection");
 
+    utilities.autoReleaseGC();
+
     process.on("SIGQUIT", this.bridgeQuitSignal);
     process.on("disconnect", this.bridgeDisconnect);
     process.on("message", this.bridgeMessageConversion);
@@ -100,7 +102,12 @@ FxClusterSrvlb.prototype.bridgeMessageConversion = function (data, handle) {
                 var socket = clients[keys[i]];
                 if (socket.isConnect == true) {
                     if (socket.namespace == spawnName) {
-                        var str = JSON.stringify({"NetStreamEvent": "NetStreamData", 'data': json.data});
+                        var str = "";
+                        if (json.data.type == 'Buffer'){
+                            str = new Buffer(json.data.data);
+                        }else{
+                            str = JSON.stringify({"NetStreamEvent": "NetStreamData", 'data': json.data});
+                        }
                         //debug('INFO::::%s bytes', Buffer.byteLength(str));
                         //!!!! cpu very busy !!!
 
@@ -259,7 +266,7 @@ function setupCluster(srv) {
 
                 fsstream.pipe(socket);
             });
-            process.stdout.write('client:' + typeof socket === 'undefined' + _get[1] + '\n');
+            process.stdout.write('client:' + (typeof socket === 'undefined') + _get[1] + '\n');
             fsstream.on('data', function (chunk) {
                 fileLength += chunk.length;
 
@@ -341,6 +348,11 @@ function socketSend(evt, spawnName) {
         if (socket.isConnect == true) {
             if (socket.namespace === spawnName)
                 socket.write(JSON.stringify(evt));
+
+            if (socket.mode == 'socket') {
+                socket.write('\0');
+            }
+
         }
 
     }

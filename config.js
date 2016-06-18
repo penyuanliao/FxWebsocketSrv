@@ -11,6 +11,8 @@ config.env = process.env.NODE_ENV;
  * **/
 config.numCPUs = require('os').cpus().length;
 
+config.assignRule = [['daabb','dabbb'],['daabc','daadb','daafb'],['daabd','daacb','dabcb'],['daabg','daabh','dabfb'],['daaib','daahb','dabeb'],['daabdg','daagb'],['daabdh','dabab']];
+
 if (config.env == 'development') {
     config.rtmpHostname = "183.182.79.162";
     config.stream_proc = "ffmpeg";
@@ -40,11 +42,9 @@ else {
         'webCluster':'',
         'webNum':0,
         'cluster': './FxClusterSrvlb.js',
-        'clusterNum': 7 //config.numCPUs -1
+        'clusterNum': config.assignRule.length
     };
 }
-
-config.assignRule = [['daabb','daabc','daabd','daaib','daabg'], ['daace','daacf','daacde','daabdg'],['daabdh','daacdf','daadb','daacb'], ['daabh','daaib','daahb','daagb'], ['dabab','dabbb','daafb'], ['dabcb','dabfb','dabeb']];
 
 //if (config.assignRule.length < config.forkOptions.num) throw new Error("assignRule != forkOptions.num");
 config.rtmpPort = 1935;
@@ -55,7 +55,7 @@ config.balance = 'url_param';//roundrobin
 if (!config.broadcast)
     config.broadcast = false; //ffmpeg FMS streaming vp62 format H.264 broadcast
 if (!config.streamSource)
-    config.streamSource = {host:'127.0.0.1', port:9527}; // middleware - connect live streaming ip and port
+    config.streamSource = {host:'127.0.0.1', port:80}; // middleware - connect live streaming ip and port
 
 /**
  * Application parameters
@@ -96,13 +96,13 @@ function appParames(){
                 if (args.toString().indexOf("-broadcast") == -1) {
                     var arg = mwInfo.toString().split(":");
                     config.streamSource = {host:arg[0], port: arg[1]};
+                    config.rtmpHostname = arg[0].toString();
                 }else {
                     throw "warning!! The '-middleware' can be not setting has to been disabled because your set '-broadcast'.";
                 }
             };
         };
-
-            });
+    });
 
     return args;
 }

@@ -46,7 +46,7 @@ function initizatialSrv() {
     setupCluster(cfg.forkOptions);
     // 2. create listen 80 port server
     createServer(cfg.srvOptions);
-    
+
 }
 /**
  * 建立tcp伺服器不使用node net
@@ -325,7 +325,6 @@ function swpanedUpdate(base64) {
             }
         }
         
-
     }else {
         assign(spawnName, function (worker) {
             if (worker) {
