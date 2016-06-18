@@ -565,9 +565,6 @@ function socketClient(host, port, namespace, cb) {
     this.cb = cb;
     this.init(host,port, namespace);
     var self = this;
-    setTimeout(function () {
-        self.socket.destroy();
-    },5000);
 }
 
 socketClient.prototype = {
