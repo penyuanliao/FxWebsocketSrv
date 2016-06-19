@@ -534,7 +534,7 @@ StreamServer.prototype.createServer = function (clusterEnable) {
 };
 
 // ================================= //
-//   Connected Broadcast Server      //
+//  Connected form Broadcast Server  //
 // ================================= //
 
 /**
@@ -553,7 +553,13 @@ StreamServer.prototype.addStreamSocket = function(host, port, namespace) {
 
     return sock;
 };
-
+/***
+ * socket classs
+ * @param host <string>IPAddress
+ * @param port <number>
+ * @param namespace <string>
+ * @param cb <function>
+ */
 function socketClient(host, port, namespace, cb) {
     this.toBufferData = true;
     this.isRetry = false;
@@ -564,7 +570,6 @@ function socketClient(host, port, namespace, cb) {
     this.namespace = namespace;
     this.cb = cb;
     this.init(host,port, namespace);
-    var self = this;
 }
 
 socketClient.prototype = {
@@ -587,14 +592,10 @@ socketClient.prototype = {
         sock.connect(port, host);
         socketHeartbeat(sock);
         this.socket = sock;
-        // socketHeartbeat(sock);
         function onConnected() {
-            console.log('connected to %s:%s', host, port,namespace);
-
+            NSLog.log('info','Connected to %s:%s', host, port,namespace);
             sock.write(namespace);
-
-
-        };
+        }
         function onData(chunk) {
             sock.doWaiting = 0;
             if (!sock.chunkBuffer) {
@@ -615,12 +616,12 @@ socketClient.prototype = {
                 if (data.length <= 0) return;
 
                 if (self.toBufferData) {
-                    if (self.cb) self.cb(data);
+                    if (self.cb && self.cb != null) self.cb(data);
                 }else {
                     try {
                         var json = JSON.parse(data.toString('utf8'));
                         if (json.NetStreamEvent == "NetStreamData") {
-                            if (self.cb) self.cb(data);
+                            if (self.cb && self.cb != null) self.cb(data);
                         }
 
                     }
@@ -628,11 +629,7 @@ socketClient.prototype = {
                         console.log(data.length);
                     }
                 }
-
-
-                // self.emit('streamData', namespace, data.toString('utf8'));
-
-            }
+            }//check pos ended
         };
         function onEnd() {
             debug('ended.');
@@ -680,6 +677,7 @@ socketClient.prototype = {
 
         if (self.try_conut >= 360) {
             clearTimeout(self.trytimeoutObj);
+            clearTimeout(self.socket.lookout);
             self.trytimeoutObj = 0;
         }
     },
@@ -700,12 +698,19 @@ socketClient.prototype = {
         this.try_conut++;
         this.socket = null;
         this.init(this.host, this.port, this.namespace);
+    },
+    replaceLine: function (opt) {
+        this.host = opt.host;
+        this.port = opt.port;
+
+        this.try_conut = 0;
+
+        this.tryAgainLater();
     }
 
 }
-
+/** 建立連線視訊資料來源 **/
 StreamServer.prototype.createClientStream = function(fileName, host , port) {
-    var self = this;
     var sn = fileName;
     var length = sn.length;
     var i, _name;
@@ -718,9 +723,11 @@ StreamServer.prototype.createClientStream = function(fileName, host , port) {
             var pathname = _name[6] + _name[8];
             var socket = this.addStreamSocket(host, port, pathname);
             this.streamSockets.push({'socket':socket,namespace:pathname});
-        };
+        }
 
-    };
+    }
+
+    NSLog.log('trace','createLiveStreams is to completion.');
 };
 StreamServer.prototype.__defineSetter__('httpEnabled', function (enabled) {
    if (typeof enabled == "boolean") {
@@ -763,6 +770,34 @@ StreamServer.prototype.ffmpegRestart = function (name) {
     }else {
 
     }
+};
+StreamServer.prototype.replaceSource = function (URL, cb) {
+
+    var _name = URL.toString().match(/^((ws[s]?):\/\/)?\/?([^:\/\s]+)(:([^\/]*))?((\/\w+)*\/)([\w\-\.]+[^#?\s]+)(\?([^#]*))?(#(.*))?$/i);
+
+    if (_name == null) {
+        if (cb) cb('Invalid characters in a URL.');
+        return;
+    }
+
+    if (typeof  _name[6] != 'undefined' && typeof _name[8] != 'undefined') {
+        var pathname = _name[6] + _name[8];
+        var ipv4 = _name[3].match(/\b((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|$)){4}\b/i);
+
+        if (ipv4 == null) {
+            if (cb) cb('you have entered an invalid IP address!');
+            return;
+        }
+        if (typeof _name[4] == 'undefined') _name[4] = 80;
+        var leng = this.streamSockets.length;
+        for (var i = 0; i < leng; i++) {
+            var obj = this.streamSockets[i];
+            if (obj.namespace == pathname) {
+                obj.socket.replaceLine({host:ipv4, port:_name[4]});
+            }
+
+        }
+    };
 };
 //sample
 // StreamServer.prototype.vp6fStream = function() {
