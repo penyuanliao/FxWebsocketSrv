@@ -3,10 +3,11 @@
  */
 
 const StreamServer = require('./StreamServer.js');
-
-var stream = new StreamServer();
 const cfg = require('../config.js');
-
+const path = require('path');
+const NSLog              = require('fxNetSocket').logger.getInstance();
+NSLog.configure({logFileEnabled:true, level:'trace', dateFormat:'[yyyy-MM-dd hh:mm:ss]',filePath:path.dirname(__dirname)+"/historyLog", maximumFileSize: 1024 * 1024 * 100});
+var stream = new StreamServer();
 stream.setupCluster(cfg.forkOptions);
 
 if (!cfg.appConfig.fileName) {
@@ -21,6 +22,7 @@ if (cfg.broadcast) {
 }else {
     console.log("create ClientStream");
     stream.createClientStream(cfg.appConfig.fileName,cfg.streamSource.host, cfg.streamSource.port);
+    
 }
 
 stream.createServer(true);

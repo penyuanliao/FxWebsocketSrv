@@ -27,6 +27,7 @@ initizatial();
 function FxClusterSrvlb() {
 
     this.setupIPCBridge();
+
 };
 
 FxClusterSrvlb.prototype.setupIPCBridge = function () {
@@ -39,7 +40,9 @@ FxClusterSrvlb.prototype.setupIPCBridge = function () {
 
     process.on("SIGQUIT", this.bridgeQuitSignal);
     process.on("disconnect", this.bridgeDisconnect);
-    process.on("message", this.bridgeMessageConversion);
+    process.on("message", this.bridgeMessageConversion.bind(this));
+
+    if (process.env.streamSource) this.addClient();
 };
 FxClusterSrvlb.prototype.bridgeDisconnect = function () {
     info("sends a QUIT signal (SIGQUIT)");
@@ -90,39 +93,7 @@ FxClusterSrvlb.prototype.bridgeMessageConversion = function (data, handle) {
         }
         else if (data.evt === "streamData") {
 
-            var spawnName = json.namespace;
-            var clients = server.getClients();
-            var keys = Object.keys(clients);
-            if (count != keys.length) {
-                count = keys.length;
-                process.stdout.write('clients.count:' + keys.length + '\n');
-            }
-            if (keys.length == 0) return;
-            for (var i = 0; i < keys.length; i++) {
-                var socket = clients[keys[i]];
-                if (socket.isConnect == true) {
-                    if (socket.namespace == spawnName) {
-                        var str = "";
-                        if (json.data.type == 'Buffer'){
-                            str = new Buffer(json.data.data);
-                        }else{
-                            str = JSON.stringify({"NetStreamEvent": "NetStreamData", 'data': json.data});
-                        }
-                        //debug('INFO::::%s bytes', Buffer.byteLength(str));
-                        //!!!! cpu very busy !!!
-
-                        //console.log('INFO::::%s bytes(%s)', Buffer.byteLength(str),socket.mode, process.env);
-                        if (socket.mode == 'socket') {
-                            socket.write(str+'\0');
-                        }else
-                        {
-                            socket.write(str);
-                        }
-                    }
-
-                }
-            }
-            keys = null;
+            this.sendStreamData(data)
 
         }
         else if (data.evt === "c_equal_division") {
@@ -144,6 +115,10 @@ FxClusterSrvlb.prototype.bridgeMessageConversion = function (data, handle) {
         }
         else if (data.evt === "processInfo") {
             process.send({"evt":"processInfo", "data" : {"memoryUsage":process.memoryUsage(),"connections": server.getConnections()}})
+        }else if (data.evt === "sourceStream") {
+
+
+
         }
 
     }else
@@ -155,6 +130,77 @@ FxClusterSrvlb.prototype.removeAllEvent = function () {
     process.removeListener("SIGQUIT", this.bridgeQuitSignal);
     process.removeListener("disconnect", this.bridgeDisconnect);
     process.removeListener("message", this.bridgeMessageConversion);
+};
+
+FxClusterSrvlb.prototype.sendStreamData = function (json) {
+    var spawnName = json.namespace;
+    var clients = server.getClients();
+    var keys = Object.keys(clients);
+    if (count != keys.length) {
+        count = keys.length;
+        process.stdout.write('clients.count:' + keys.length + '\n');
+    }
+    if (keys.length == 0) return;
+    for (var i = 0; i < keys.length; i++) {
+        var socket = clients[keys[i]];
+        if (socket.isConnect == true) {
+            if (socket.namespace == spawnName) {
+                var str = "";
+                if (json.data.type == 'Buffer'){
+                    str = new Buffer(json.data.data);
+                }else{
+                    str = JSON.stringify({"NetStreamEvent": "NetStreamData", 'data': json.data});
+                }
+                //debug('INFO::::%s bytes', Buffer.byteLength(str));
+                //!!!! cpu very busy !!!
+
+                //console.log('INFO::::%s bytes(%s)', Buffer.byteLength(str),socket.mode, process.env);
+                if (socket.mode == 'socket') {
+                    socket.write(str+'\0');
+                }else
+                {
+                    socket.write(str);
+                }
+            }
+
+        }
+    }
+    keys = null;
+}
+var socketClient = require('./archSwitches/socketClient.js');
+FxClusterSrvlb.prototype.vClient = function (fileName) {
+    var self = this;
+    var client = new net.Socket();
+    var soucre = {}
+    soucre.host = process.env.streamSource;
+    soucre.port = 80;
+    // console.log('CONNECTED TO: ' + soucre.host + ':' + soucre.port,fileName);
+    var sock = new socketClient( soucre.host, soucre.port, fileName, function (data) {
+        self.sendStreamData({'evt':'streamData','namespace':fileName,'data':data});
+    });
+};
+
+FxClusterSrvlb.prototype.addClient = function() {
+
+    var cdid = process.env.NODE_CDID;
+    var assgin = cfg.assignRule[cdid];
+    var list = [];
+    for (var i = 0; i < assgin.length; i++) {
+        var obj = assgin[i];
+
+        list.push('/video/'+ obj +'/video0/');
+        list.push('/video/'+ obj +'/video1/');
+        list.push('/video/'+ obj +'/videosd/');
+        if (obj == 'daacb' || obj === 'daagb') {
+            list.push('/video/'+ obj +'/video2/');
+        }
+
+    }
+    for (var j = 0; j < list.length; j++) {
+        var obj = list[j];
+        this.vClient(obj);
+
+    }
 };
 
 module.exports = exports = FxClusterSrvlb;
@@ -189,8 +235,15 @@ function setupCluster(srv) {
             if (json.NetStreamEvent === 'getConnections') {
                 evt.client.write(JSON.stringify({"NetStreamEvent":"getConnections","data":srv.getConnections()}));
             }
+
+            if (json["event"] == 'PingEvent'){
+                evt.client.write(JSON.stringify({"event":"PingEvent","data":json['data']}));
+            }
+
         }
-        catch (e) { };
+        catch (e) {
+            evt.client.write(JSON.stringify({"event":"Error.Function"}));
+        };
     });
     /** client socket destroy **/
     srv.on('disconnect', function (socket) {
@@ -360,8 +413,10 @@ function socketSend(evt, spawnName) {
     keys = null;
 
 }
-/* ------- ended testing logger ------- */
+/* ------- ended testing logger ------- */     
 
 process.on('uncaughtException', function (err) {
     console.error(err.stack);
 });
+
+

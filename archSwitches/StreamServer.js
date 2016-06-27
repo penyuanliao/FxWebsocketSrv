@@ -15,8 +15,6 @@ const pheaders           = parser.headers;
 const utilities          = fxNetSocket.utilities;
 const daemon             = fxNetSocket.daemon;
 const NSLog              = fxNetSocket.logger.getInstance();
-console.log(path.dirname(__dirname));
-NSLog.configure({logFileEnabled:true, level:'info', dateFormat:'[yyyy-MM-dd hh:mm:ss]',filePath:path.dirname(__dirname)+"/historyLog", maximumFileSize: 1024 * 1024 * 100});
 var cfg = require('../config.js');
 var IPSec;
 var secPath = path.dirname(__dirname) + "/configfile/SecurityProfile.json";
@@ -83,7 +81,7 @@ StreamServer.prototype.createLiveStreams = function(fileName) {
     var sn = fileName;
     var length = sn.length;
     var spawned, _name, i;
-    debug('Init createLiveStreams');
+    NSLog.log('info','Init createLiveStreams');
     for (i = 0; i < length; i++) {
         // schema 2, domain 3, port 5, path 6,last path 7, file 8, querystring 9, hash 12
         _name = sn[i].toString().match(/^((rtmp[s]?):\/)?\/?([^:\/\s]+)(:([^\/]*))?((\/\w+)*\/)([\w\-\.]+[^#?\s]+)(\?([^#]*))?(#(.*))?$/i);
@@ -275,6 +273,7 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
 
     tcp.on('onRead', function (nread, buffer, handle) {
 
+        handle.readStop();
         var remoteInfo = {};
         handle.getsockname(remoteInfo);
 
@@ -287,12 +286,23 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
 
         if(handle.mode == 'ws' || handle.mode == 'socket' || handle.mode == 'flashsocket') {
 
+            if(handle.namespace.indexOf("policy-file-request") != -1 ) {
+                NSLog.log('warning','Clients(%s:%s) not uninvited ... to close().', remoteInfo.address, remoteInfo.port);
+                handle.close();
+                return;
+            }
+            if (handle.namespace === "/testline/g1") {
+                self.clusters[0][0].send({'evt':'c_init',data:buffer}, handle,[{ track: false, process: false }]);
+                return;
+            }
+
             //TODO fms vp6f sample
             console.log("handle.namespace : ",handle.namespace);
             //過濾不明的namesapce
             if (handle.namespace.substr(0,1) != "/") {
                 handle.close();
                 handle = null;
+                return;
             };
 
             if (handle.namespace === "/video/vp6f/video0/") {
@@ -472,6 +482,8 @@ StreamServer.prototype.setupCluster = function(opt) {
             var env = process.env;
             env.NODE_CDID = i;
             env.PORT = cfg.appConfig.port;
+            if(cfg.broadcast == false)
+                env.streamSource = cfg.streamSource.host;
             //var cluster = proc.fork(opt.cluster,{silent:false}, {env:env});
             var cluster = new daemon("" + opt.cluster,{silent:false}, {env:env}); //心跳系統
             cluster.init();
@@ -492,10 +504,19 @@ StreamServer.prototype.initCluster = function(opt,id) {
     var cluster = new daemon(opt.cluster,{silent:false}, {env:env});
     cluster.init();
     cluster.name = 'channel_' + env.NODE_CDID;
-    if (!this.clusters[i]) {
-        this.clusters[i] = [];
+    if (!this.clusters[id]) {
+        this.clusters[id] = [];
     }
-    this.clusters[i][0] = cluster;
+    this.clusters[id][0] = cluster;
+};
+StreamServer.prototype.setupFMSCluster = function (opt) {
+    var env = process.env;
+    env.NODE_CDID = (typeof id == 'undefined') ? this.clusters.length : id;
+    env.PORT = cfg.appConfig.port;
+    var cluster = new daemon(opt.cluster,{silent:false}, {env:env});
+    cluster.init();
+    cluster.name = 'channel_' + env.NODE_CDID;
+    this.fmsSrv = cluster;
 };
 
 StreamServer.prototype.setupSingleServer = function () {
@@ -544,14 +565,42 @@ StreamServer.prototype.createServer = function (clusterEnable) {
  * @param namespace is specified path
  * @returns {*|Socket}
  */
+var spawn = require('child_process').spawn;
 StreamServer.prototype.addStreamSocket = function(host, port, namespace) {
 
     var self = this;
-    var sock = new socketClient( host, port, namespace, function (data) {
-        self.emit('streamData', namespace, data);
-    });
+    // var sock = new socketClient( host, port, namespace, function (data) {
+    //     self.emit('streamData', namespace, data);
+    // });
+    //
+    // return sock;
 
-    return sock;
+    var env = process.env;
+    env.NODE_CDID = 0;
+    env.port = port;
+    env.host = host;
+    env.namespace = namespace;
+    env.cpMode = 'spawn';
+    var cluster;
+    if ( env.cpMode != 'spawn') {
+        cluster = proc.fork('./archSwitches/socketClient.js',{silent:false}, {env:env});
+        cluster.on('message',function (data) {
+            console.log(data);
+        })
+    }else {
+        cluster = spawn('node',['./archSwitches/socketClient.js'],{env:env});
+        cluster.vBuf = undefined;
+        cluster.stdout.on('data',function (data) {
+            self.emit('streamData', namespace, data);
+        });
+        cluster.stderr.on('data',function (data) {
+
+        });
+    }
+
+
+    
+    return cluster;
 };
 /***
  * socket classs
@@ -721,8 +770,8 @@ StreamServer.prototype.createClientStream = function(fileName, host , port) {
 
         if (typeof  _name[6] != 'undefined' && typeof _name[8] != 'undefined') {
             var pathname = _name[6] + _name[8];
-            var socket = this.addStreamSocket(host, port, pathname);
-            this.streamSockets.push({'socket':socket,namespace:pathname});
+            // var socket = this.addStreamSocket(host, port, pathname);
+            // this.streamSockets.push({'socket':socket,namespace:pathname});
         }
 
     }
