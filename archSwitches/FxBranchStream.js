@@ -10,7 +10,7 @@ NSLog.configure({logFileEnabled:true, level:'trace', dateFormat:'[yyyy-MM-dd hh:
 var stream = new StreamServer();
 stream.setupCluster(cfg.forkOptions);
 
-if (!cfg.appConfig.fileName) {
+if (!cfg.appConfig.fileName && cfg.broadcast) {
     throw Error('config not found fileName setting.');
     process.exit(0);
     return;
@@ -19,21 +19,25 @@ if (!cfg.appConfig.fileName) {
 if (cfg.broadcast) {
     console.log("create LiveStream");
     stream.createLiveStreams(cfg.appConfig.fileName);
+
+    // stream.setupTCPBroadcast();
+
 }else {
     console.log("create ClientStream");
-    stream.createClientStream(cfg.appConfig.fileName,cfg.streamSource.host, cfg.streamSource.port);
-    
+    // stream.createClientStream(cfg.appConfig.fileName,cfg.streamSource.host, cfg.streamSource.port);
+
+    // stream.setupTCPMulticast();
 }
 
 stream.createServer(true);
 
-stream.on('streamData', function (name, base64) {
+stream.on('streamData', function (name, base64, info) {
 
     if (cfg.balance === "roundrobin") {
         for (var i = 0; i < stream.clusters.length; i++) {
             var cluster = stream.clusters[i][0];
             if (cluster) {
-                cluster.send({'evt':'streamData','namespace':name,'data':base64});
+                cluster.send({'evt':'streamData','namespace':name,'data':base64, 'info':info});
             }else {
                 throw Error("The cluster(assigned to " + name + ") was not found on this Server.");
             }
@@ -41,7 +45,7 @@ stream.on('streamData', function (name, base64) {
     }else {
         stream.assign(name, function (cluster) {
             if (cluster) {
-                cluster.send({'evt':'streamData','namespace':name,'data':base64});
+                cluster.send({'evt':'streamData','namespace':name,'data':base64, 'info':info});
             }else {
                 throw Error("The cluster(assigned to " +  name + ") was not found on this Server.");
             }

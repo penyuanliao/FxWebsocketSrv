@@ -7,6 +7,7 @@ const debug              = require('debug')('Node:StreamServer'); //debug
 const path               = require('path');
 const util               = require('util');
 const fs                 = require('fs');
+const dgram              = require('dgram'); // UDP
 const fxNetSocket        = require('fxNetSocket');
 const clusterConstructor = fxNetSocket.clusterConstructor;
 const outputStream       = fxNetSocket.stdoutStream;
@@ -67,7 +68,7 @@ function StreamServer() {
     this.clusterEnable = false;
     // this.vp6fStream();
     /** 橋接層是否開啟網頁測試 **/
-    cfg.httpEnabled = true;
+    cfg.httpEnabled = false;
     utilities.autoReleaseGC();
 };
 StreamServer.prototype.onMessage = function (data) {
@@ -108,10 +109,10 @@ StreamServer.prototype.createLiveStreams = function(fileName) {
 
     /** ffmpeg stream pull the data of a base64 **/
 
-    function swpanedUpdate(base64) {
+    function swpanedUpdate(base64, info) {
         self.doWaiting[this.ffmpeg_pid] = 0;
         var spawnName = this.name;
-        self.emit('streamData', spawnName, base64);
+        self.emit('streamData', spawnName, base64, info);
 
     };
     /** ffmpeg stream close **/
@@ -289,10 +290,12 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
             if(handle.namespace.indexOf("policy-file-request") != -1 ) {
                 NSLog.log('warning','Clients(%s:%s) not uninvited ... to close().', remoteInfo.address, remoteInfo.port);
                 handle.close();
+                tcp.handleRelease(handle);
                 return;
             }
             if (handle.namespace === "/testline/g1") {
-                self.clusters[0][0].send({'evt':'c_init',data:buffer}, handle,[{ track: false, process: false }]);
+                self.clusters[0][0].send({'evt':'c_init',data:buffer}, handle,{keepOpen:false});
+                tcp.waithandleClose(5000);
                 return;
             }
 
@@ -301,12 +304,14 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
             //過濾不明的namesapce
             if (handle.namespace.substr(0,1) != "/") {
                 handle.close();
+                tcp.handleRelease(handle);
                 handle = null;
                 return;
             };
 
             if (handle.namespace === "/video/vp6f/video0/") {
-                self.clusters[0][0].send({'evt':'c_init',data:buffer}, handle,[{ track: false, process: false }]);
+                self.clusters[0][0].send({'evt':'c_init',data:buffer}, handle,{keepOpen:false});
+                tcp.waithandleClose(handle,5000);
                 return;
             }
 
@@ -314,9 +319,10 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
                 
                 if (typeof worker === 'undefined') {
                     handle.close();
-                    handle = null;
+                    tcp.handleRelease(handle);
                 }else{
-                    worker.send({'evt':'c_init',data:buffer}, handle,[{ track: false, process: false }]);
+                    worker.send({'evt':'c_init',data:buffer}, handle,{keepOpen:false});
+                    tcp.waithandleClose(handle,5000);
                 };
 
             });
@@ -326,16 +332,18 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
                 var worker = self.clusters[0][0];
 
                 if (typeof worker === 'undefined') return;
-                worker.send({'evt':'c_init',data:buffer}, handle,[{ track: false, process: false }]);
+                worker.send({'evt':'c_init',data:buffer}, handle,{keepOpen:false});
+                tcp.waithandleClose(handle,5000);
                 return;
             }
 
             debug('The client(%s:%s) try http request but Not Support HTTP procotol.',remoteInfo.address, remoteInfo.port);
             handle.close();
-            handle = null;
+            tcp.handleRelease(handle);
         }else {
             console.error('Not found client to use the %s request Connections!!', remoteInfo.address);
             handle.close();
+            tcp.handleRelease(handle);
         }
 
     });
@@ -552,6 +560,106 @@ StreamServer.prototype.createServer = function (clusterEnable) {
     {
         // todo single server
     }
+};
+// ================================= //
+//  UDP broadcast Send Other Server  //
+// ================================= //
+StreamServer.prototype.setupTCPBroadcast = function () {
+    var self = this;
+    var port = 10080;
+    var bConnections = [];
+    var srv = this.broadcastSrv = net.createServer(function (socket) {
+        socket.name = socket.remoteAddress + "\:" + socket.remotePort;
+        bConnections[socket.name] = socket;
+
+        socket.on('close', function () {
+            socket.destroy();
+            bConnections[socket.name] = null;
+            delete bConnections[socket.name];
+        });
+        socket.on('error', function () {
+            socket.destroy();
+        });
+    });
+    
+    srv.listen(port);
+
+    this.on('streamData', function (namespace, data, info) {
+
+        var json = {'evt':'streamData','namespace':namespace,'data':data};
+
+        var keys = Object.keys(bConnections);
+
+        for (var i = 0; i < keys.length; i++) {
+            var sock = bConnections[keys[i]];
+            if (!sock || sock == null) return;
+            sock.write(JSON.stringify(json) +'\0');
+        }
+    });
+
+};
+StreamServer.prototype.setupTCPMulticast = function () {
+    // var self = this;
+    var port = 10080;
+    var host = '127.0.0.1';
+    var repeated = undefined;
+    var connections = {};
+
+
+    var multi = new net.Socket();
+    multi.on('connection',function () {
+        clearInterval(repeated);
+    });
+    multi.on('data',function (data) {
+
+    });
+
+
+
+    multi.on('close',function () {
+        repeated = setInterval(function () {
+            socket.connect(port, host);
+        },10000);
+    });
+    multi.on('error',function (error) {
+        socket.end();
+        socket.destroy();
+    });
+    multi.connect(port, host);
+
+    // var sockPath = path.join('/dev/shm/', 'nodeJS-cgi.sock');
+    var sockPath = path.join('/Users/penyuan/Documents/Project/webstorms/FxWebsocketSrv/test/', 'nodeJS-cgi.sock');
+
+    //delete file
+    try {
+        fs.unlinkSync(sockPath);
+    }
+    catch (e) {
+
+    }
+
+    //common gateway interface
+    var cgiGUID = 0;
+    var cgiSrv = net.createServer(function (socket) {
+        socket.name = "sock_" + cgiGUID++;
+        connections[socket.name] = socket;
+
+        multi.pipe(socket);
+
+        socket.on('close', function () {
+            var tmp = cgiSrv.connections[socket.name];
+            connections[socket.name] = null;
+            delete connections[socket.name];
+        });
+        socket.on('error', function () {
+            socket.destroy();
+        });
+
+    });
+
+    cgiSrv.listen(sockPath);
+
+    
 };
 
 // ================================= //
@@ -778,6 +886,11 @@ StreamServer.prototype.createClientStream = function(fileName, host , port) {
 
     NSLog.log('trace','createLiveStreams is to completion.');
 };
+
+
+
+
+
 StreamServer.prototype.__defineSetter__('httpEnabled', function (enabled) {
    if (typeof enabled == "boolean") {
        cfg.httpEnabled = enabled;
