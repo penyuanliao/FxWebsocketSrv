@@ -565,10 +565,12 @@ StreamServer.prototype.createServer = function (clusterEnable) {
 //  UDP broadcast Send Other Server  //
 // ================================= //
 StreamServer.prototype.setupTCPBroadcast = function () {
+    console.log('startup setupTCPBroadcast');
     var self = this;
     var port = 10080;
     var bConnections = [];
     var srv = this.broadcastSrv = net.createServer(function (socket) {
+        console.log('srv socket connection');
         socket.name = socket.remoteAddress + "\:" + socket.remotePort;
         bConnections[socket.name] = socket;
 
@@ -579,6 +581,12 @@ StreamServer.prototype.setupTCPBroadcast = function () {
         });
         socket.on('error', function () {
             socket.destroy();
+        });
+        socket.on('data', function (data) {
+
+            socket.namespace = data.toString('utf8');
+
+            console.log(socket.namespace);
         });
     });
     
@@ -593,42 +601,61 @@ StreamServer.prototype.setupTCPBroadcast = function () {
         for (var i = 0; i < keys.length; i++) {
             var sock = bConnections[keys[i]];
             if (!sock || sock == null) return;
-            sock.write(JSON.stringify(json) +'\0');
+            if (namespace == sock.namespace)
+                sock.write(JSON.stringify(json) +'\0');
         }
     });
 
 };
 StreamServer.prototype.setupTCPMulticast = function () {
+
+    console.log('startup setupTCPMulticast');
+
     // var self = this;
     var port = 10080;
     var host = '127.0.0.1';
-    var repeated = undefined;
     var connections = {};
-
-
-    var multi = new net.Socket();
-    multi.on('connection',function () {
-        clearInterval(repeated);
-    });
-    multi.on('data',function (data) {
-
+    var json;
+    fs.readFile('./configfile/info.json','utf8',function (err,data) {
+        json = JSON.parse(data.toString('utf8'));
+        setupChannel(json["videos"]);
     });
 
+    var multi = [];
 
+    function setupChannel(videos){
+        console.log('startup setupChannel:',videos.length);
 
-    multi.on('close',function () {
-        repeated = setInterval(function () {
-            socket.connect(port, host);
-        },10000);
-    });
-    multi.on('error',function (error) {
-        socket.end();
-        socket.destroy();
-    });
-    multi.connect(port, host);
+        for (var i = 0; i < videos.length; i++) {
+            var namespace = videos[i];
+            var sock = new net.Socket();
+            sock.namespace = namespace;
+            multi[namespace] = sock;
+            sock.on('connect',function () {
+                console.log('connect ',this.namespace);
+                clearInterval(this.repeated);
+                this.write(this.namespace);
+            });
+            sock.on('data',function (data) {
+                // console.log('data',data.length);
+            });
+            sock.on('close',function () {
+                console.log('setupChannel is close >>>>>');
+                sock.repeated = setInterval(function () {
+                    sock.connect(port, host);
+                },10000);
+            });
+            sock.on('error',function (error) {
+                sock.destroy();
+            });
 
-    // var sockPath = path.join('/dev/shm/', 'nodeJS-cgi.sock');
-    var sockPath = path.join('/Users/penyuan/Documents/Project/webstorms/FxWebsocketSrv/test/', 'nodeJS-cgi.sock');
+            sock.connect(port, host);
+
+        }
+
+    }
+
+    var sockPath = path.join(cfg.unixSokConfig.path, cfg.unixSokConfig.filename);
 
     //delete file
     try {
@@ -644,7 +671,15 @@ StreamServer.prototype.setupTCPMulticast = function () {
         socket.name = "sock_" + cgiGUID++;
         connections[socket.name] = socket;
 
-        multi.pipe(socket);
+        // multi.pipe(socket);
+        socket.on('data', function (chunk) {
+           var str = chunk.toString('utf8');
+            if (typeof multi[str] != 'undefined') {
+                console.log(' pipe:', str);
+                socket.namespace = str;
+                multi[str].pipe(socket);
+            }
+        });
 
         socket.on('close', function () {
             var tmp = cgiSrv.connections[socket.name];
@@ -783,7 +818,7 @@ socketClient.prototype = {
 
                     }
                     catch (e) {
-                        console.log(data.length);
+                        console.log('onData',data.length);
                     }
                 }
             }//check pos ended
