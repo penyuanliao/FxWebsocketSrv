@@ -6,30 +6,18 @@
 const Log = require('debug');
 const debug = Log('LiveCluster');
 const info = Log('INFO:IPCBridge');
-
-const dgram        = require('dgram');
-const fxNetSocket  = require('fxNetSocket');
+const fxNetSocket = require('fxNetSocket');
 const FxConnection = fxNetSocket.netConnection;
 //var outputStream = fxNetSocket.stdoutStream;
 const parser = fxNetSocket.parser;
 var utilities = fxNetSocket.utilities;
 //var logger = fxNetSocket.logger;
 const fs  = require('fs');
-
+const path = require('path');
 const net  = require('net');
 const evt = require('events');
 const cfg = require('./config.js');
 const proc = require('child_process');
-const path = require('path');
-const NSLog        = require('fxNetSocket').logger.getInstance();
-NSLog.configure({
-    logFileEnabled:false,
-    consoleEnabled:false,
-    level:'trace',
-    dateFormat:'[yyyy-MM-dd hh:mm:ss]',
-    filePath:path.dirname(__dirname)+"/historyLog",
-    maximumFileSize: 1024 * 1024 * 100});
-
 /** 多執行緒 **/
 var server = null;
 var count = 0;
@@ -54,19 +42,7 @@ FxClusterSrvlb.prototype.setupIPCBridge = function () {
     process.on("disconnect", this.bridgeDisconnect);
     process.on("message", this.bridgeMessageConversion.bind(this));
 
-    if (process.env.streamSource) {
-
-        fs.readFile('./configfile/info.json','utf8',function (err,data) {
-            var json = JSON.parse(data.toString('utf8'));
-            for (var i = 0; i < json["videos"].length; i++) {
-                var namespace = json["videos"][i];
-                self.addCGIClient(namespace);
-            }
-        });
-
-
-    }
-    // if (process.env.streamSource) this.addClient();
+    if (process.env.streamSource) this.addClient();
 };
 FxClusterSrvlb.prototype.bridgeDisconnect = function () {
     info("sends a QUIT signal (SIGQUIT)");
@@ -168,16 +144,16 @@ FxClusterSrvlb.prototype.sendStreamData = function (json) {
     //** 載入問題 **/
     if (!preStream[json.namespace]) preStream[json.namespace] = {};
     var stream = preStream[json.namespace];
-    if (Buffer.byteLength(json.data) > 30000) {
-        stream["IFrame"] = {"NetStreamEvent": "NetStreamData", 'data': json.data};
+    if (Buffer.byteLength(json.data) > 25000) {
+        stream["IFrame"] = {"NetStreamEvent": "NetStreamData",'keyframe': json.info.keyframe, 'data': json.data};
         if (!stream.PFrame) stream["PFrame"] = [];
         stream.PFrame.length = 0;
     }
-    if (Buffer.byteLength(json.data) < 30000) {
+    if (Buffer.byteLength(json.data) < 25000) {
 
         if (!stream.PFrame) stream["PFrame"] = [];
 
-        stream.PFrame.push({"NetStreamEvent": "NetStreamData", 'data': json.data});
+        stream.PFrame.push({"NetStreamEvent": "NetStreamData",'keyframe': json.info.keyframe, 'data': json.data});
     }
 
     if (keys.length == 0) return;
@@ -189,7 +165,7 @@ FxClusterSrvlb.prototype.sendStreamData = function (json) {
                 if (json.data.type == 'Buffer'){
                     str = new Buffer(json.data.data);
                 }else{
-                    str = JSON.stringify({"NetStreamEvent": "NetStreamData", 'data': json.data});
+                    str = JSON.stringify({"NetStreamEvent": "NetStreamData",'type':json.info.sliceType,'keyframe': json.info.keyframe, 'data': json.data});
                 }
 
                 //debug('INFO::::%s bytes', Buffer.byteLength(str));
@@ -244,80 +220,9 @@ FxClusterSrvlb.prototype.addClient = function() {
     }
 };
 
-FxClusterSrvlb.prototype.addCGIClient = function (namespace) {
-
-    console.log('addCGIClient', namespace);
-
-    var self = this;
-    var sockPath = path.join(cfg.unixSokConfig.path, cfg.unixSokConfig.filename);
-    var repeated = undefined;
-    var socket = new net.Socket();
-    socket.on('connect',function () {
-        NSLog.log('info','connect %s:%s', cfg.unixSokConfig.filename, namespace);
-        clearInterval(repeated);
-        repeated = undefined
-        socket.write(namespace);
-    });
-    socket.on('data',function (chunk) {
-        if (!socket.chunkBuffer) {
-            socket.chunkBuffer = new Buffer(chunk);
-        }else {
-            socket.chunkBuffer = Buffer.concat([socket.chunkBuffer, chunk], socket.chunkBuffer.length + chunk.length);
-        }
-        socket.chunkSize += chunk.length;
-
-        var pos = socket.chunkBuffer.indexOf('\u0000');
-        if (pos != -1) {
-            var data = socket.chunkBuffer.slice(0, pos);
-
-            pos++;//含/0
-            socket.chunkSize -= pos;
-            socket.chunkBuffer = socket.chunkBuffer.slice(pos, socket.chunkBuffer.length);
-
-            if (data.length <= 0) return;
-
-            try {
-
-                var json = JSON.parse(data.toString('utf8'));
-
-                if (json.evt == "streamData") {
-                    self.sendStreamData({'evt':'streamData','namespace':json.namespace,'data':json.data});
-                }
-
-            }
-            catch (e) {
-                console.log(data.length);
-            }
-        }//check pos ended
-    });
-    socket.on('close',function () {
-        if (typeof repeated == 'undefined'){
-
-            NSLog.log('trace',"Unix Socket %s try a again.", namespace);
-
-            repeated = setInterval(function () {
-                socket.chunkBuffer = undefined;
-                socket.connect(sockPath);
-            },10000);
-        }
-
-    });
-    socket.on('error',function (err) {
-        socket.destroy();
-        NSLog.log('info',"Unix Socket %s error:%s", namespace, err);
-    });
-
-
-    socket.connect(sockPath);
-};
-
 module.exports = exports = FxClusterSrvlb;
 
 new FxClusterSrvlb();
-
-
-
-
 
 /** cluster ended **/
 
@@ -348,14 +253,7 @@ function setupCluster(srv) {
 
         for (var i = 0; i < stream.PFrame.length; i++) {
             var obj = stream.PFrame[i];
-
-            if (socket.mode == 'socket') {
-                socket.write(JSON.stringify(obj) + '\0');
-            }else
-            {
-                socket.write(JSON.stringify(obj));
-            }
-
+            socket.write(JSON.stringify(obj));
         }
 
     });

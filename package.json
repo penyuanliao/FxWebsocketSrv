@@ -1,6 +1,6 @@
 {
   "name": "FxWebsocketSrv",
-  "version": "0.2.1",
+  "version": "0.2.0",
   "private": true,
   "dependencies": {
     "debug": "^2.2.0",

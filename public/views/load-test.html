@@ -24,9 +24,8 @@
     </style>
     <script type="text/javascript" src="../js/broadway/Decoder.js"></script>
     <!--<script type="text/javascript" src="../js/broadway/YUVWebGLCanvas.js"></script>-->
-    <script type="text/javascript" src="../js/broadway/Player.js"></script>
     <script type="text/javascript" src="../js/broadway/YUVCanvas.js"></script>
-
+    <script type="text/javascript" src="../js/broadway/Player.js"></script>
     <script type="text/javascript" src="../js/broadway/stream.js"></script>
 </head>
 <br>
@@ -35,63 +34,10 @@
     function load() {
         var nodes = document.querySelectorAll('div.broadway');
 
-
-        const customerData = [
-            { ssn: "444-44-4444", name: "Bill", age: 35, email: "bill@company.com" },
-            { ssn: "555-55-5555", name: "Donna", age: 32, email: "donna@home.org" }
-        ];
-
-        if(!window.indexedDB) {
-            window.alert("not support indexedDB!");
-        }else
-        {
-            console.log('is support indexedDB');
-        }
-        var db, dbVersion = 5;
-        var req = window.indexedDB.open("indxDB", dbVersion);
-        req.onerror = function (evt) {
-            console.log('request.errorCode', evt);
-        };
-        req.onsuccess = function(evt) {
-            // Do something with request.result!
-            console.log('Do something with request.result!', evt);
-            db = evt.target.result;
-            console.log(db);
-        };
-        //(0)dbVersion +1 -> onupgradeneeded -> refresh -> onsuccess
-        req.onupgradeneeded = function(event) {
-            var db = event.target.result;
-            console.log('running onupgradeneeded');
-            if (!db.objectStoreNames.contains("firstOS")) {
-                db.createObjectStore("firstOS");
-                console.log('do firstOS');
-            }
-        }
-
-//        for (var i = 0; i < nodes.length; i++) {
-//            var broadway = new Broadway(nodes[i]);
-////            broadway.decode()
-//            // broadway.play();
-//        };
-//        var rawFile = new XMLHttpRequest();
-//        rawFile.open("GET", '../js/broadway/Decoder.js', false);
-//        rawFile.onreadystatechange = function ()
-//        {
-//            if(rawFile.readyState === 4)
-//            {
-//                if(rawFile.status === 200 || rawFile.status == 0)
-//                {
-//                    var allText = rawFile.responseText;
-//                    alert(allText);
-//                }
-//            }
-//        }
-//        rawFile.send(null);
-
         var player = createPlayer(nodes[0]); // 播放器
         var ws; // websocket連線
         var selectBtn;
-        var decode = new Decoder();
+
         var st,group;
 
         player.onPictureDecoded = function (buffer, width, height, infos) {
@@ -124,7 +70,7 @@
             return array;
         };
 
-        var liveList = ["live1","live2"];
+        var liveList = ["start","stop"];
 
         for (var i = 0; i < liveList.length; i++) {
             var obj = liveList[i];
@@ -136,6 +82,16 @@
             }
         }
         function onClickHandleStop(e) {
+            var c = player.canvasObj.webGLCanvas.contextGL;
+            console.log("isWebGL ",player.canvasObj.webGLCanvas.contextGL);
+                c.clearColor(0.0, 0.0, 0.0, 1.0);
+                c.clear(c.COLOR_BUFFER_BIT);
+            player.decoder.onCleanUp();
+            ws.close();
+            console.log('ws close()');
+            return;
+
+
             if (typeof ws != 'undefined' && ws != null)
             {
                 console.log('ws close onClickHandle');
@@ -160,7 +116,7 @@
 
             var btn = this;
             selectBtn = btn;
-            btn.disabled = true;
+//            btn.disabled = true;
             if (typeof ws != 'undefined' && ws != null)
             {
                 console.log('ws close onClickHandle');
@@ -172,9 +128,9 @@
                 ws.removeEventListener("open", onCloseHandle);
                 ws.removeEventListener("close", onOpenHandle);
                 ws.removeEventListener("message", onMessageHandle);
-                nodes[0].removeChild(player.canvas);
-                player = null;
-                player = createPlayer(nodes[0]);
+//                nodes[0].removeChild(player.canvas);
+//                player = null;
+//                player = createPlayer(nodes[0]);
             };
 
             liveStream(document.getElementById('live').value);
@@ -183,7 +139,16 @@
         function liveStream(namespace) {
             var select = document.getElementById('quality');
             var quality = select.value;
-            var wsURL = 'ws://' + '127.0.0.1:9527' + '/video/'+ namespace +'/' + quality + '/';
+//            var wsURL = 'wss://' + 'hktest.04vip.com' + '/fxvideo/video/'+ namespace +'/' + quality + '/';
+//            var wsURL = 'ws://' + '103.24.83.229:80' + '/fxvideo/video/'+ namespace +'/' + quality + '/';
+//            var wsURL = 'ws://' + '103.243.21.252:80' + '/fxvideo/video/'+ namespace +'/' + quality + '/';
+            var wsURL = 'ws://' + '103.24.83.253' + '/fxVideo/video/'+ namespace +'/' + quality + '/';
+//            var wsURL = 'ws://' + '103.24.83.229:80' + '/fxvideo/video/'+ namespace +'/' + quality + '/';
+//            var wsURL = 'ws://' + '183.182.79.162:80' + '/fxvideo/video/'+ namespace +'/' + quality + '/';
+//            var wsURL = 'ws://' + '183.182.64.182' + '/fxlive/video/shane/shane/';
+//            var wsURL = 'ws://' + '127.0.0.1:8000' + '/fxlive/video/shane/shane/';
+//            var wsURL = 'ws://' + '127.0.0.1:8000'  + '/fxvideo/video/'+ namespace +'/' + quality + '/';
+
             ws = new WebSocket(wsURL);
             ws.onopen = onOpenHandle;
             ws.onclose = onCloseHandle;
@@ -196,14 +161,20 @@
         };
         function onOpenHandle(evt){
             console.log('websocket on connected.');
-            ws.send("hi server");
+//            ws.send("/memInfo");
+
         };
         function onMessageHandle(evt) {
 //            console.log('data connected.',evt);
             var json = JSON.parse(evt.data);
+            if (json.NetStatusEvent == 'NetConnect.Success'){
+//                ws.send(JSON.stringify({event:'PingEvent',data:"7890"}));
+            }
+
 
             if (json.NetStreamEvent === "NetStreamData") {
                 var bin = toUint8Array(json.data);
+                console.log('NetStreamData ', bin.length);
                 player.decode(bin);
 //                decode.decode(bin);
                 connecttd();
@@ -311,8 +282,8 @@
     </br>
     <p style="display: inline-block; width: 100%">
 
-        <button id="live1" class="button" >start</button>
-        <button id="live2" class="button" >stop</button>
+        <button id="start" class="button" >start</button>
+        <button id="stop" class="button" >stop</button>
         <p>
             Stream:
             <select id="live" style="width: 240px;height: 34px; overflow: hidden; border: 1px solid #ccc;">
@@ -322,7 +293,7 @@
                 <option value="daabg">Baccarat D</option>
                 <option value="daabh">Baccarat E</option>
                 <option value="daabdg">Baccarat I</option>
-                <option value="daadgh">Baccarat J</option>
+                <option value="daabdh">Baccarat J</option>
                 <option value="daadb">DragonTiger</option>
                 <option value="daacb">Mahjong</option>
                 <option value="daaib">Sicbo</option>

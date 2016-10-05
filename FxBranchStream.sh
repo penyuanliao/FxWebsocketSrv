@@ -42,11 +42,6 @@ read -p "Create Master FFMPEG Streaming media Server? (y or n ):" userArg1;
 
 service=${userArg1:-"service"}
 
-if [ "$userArg1" == '' ]
-then
-    userArg1='y';
-fi
-
 echo " + + NodeJS Server START. + + "
 
 if [ "$service" == "y" ]

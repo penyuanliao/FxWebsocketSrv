@@ -276,6 +276,9 @@ function swpanedClosed(code){
         debug("listen swpaned Closed - ",this.name, " < REBOOTING >");
         rebootStream(this,true);
     }
+
+    logger.reachabilityWithHostName(cfg.videoDomainName);
+
 };
 /** 觀察記憶體使用狀況 **/
 function observerTotoalUseMem() {

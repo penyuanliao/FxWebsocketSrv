@@ -169,6 +169,7 @@ StreamServer.prototype.socketSend = function(handle, spawnName) {
     for (var i = 0; i < this.clusters.length; i++) {
         if (this.clusters[i]) {
             this.clusters[i][0].send({'handle':handle,'evt':'socketSend','spawnName':spawnName});
+
         }
 
     }
@@ -348,7 +349,7 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
 
     });
 
-}
+};
 /**
  *
  * 建立tcp伺服器不使用node net

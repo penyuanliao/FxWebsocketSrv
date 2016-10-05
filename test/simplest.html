@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script type="application/javascript">
+
+    window.onload = load;
+
+    function load() {
+
+        var wsURL = "ws://183.182.74.182/video/vp6f/video0/";
+        var ws = new WebSocket(wsURL);
+        ws.onopen = onOpenHandle;
+        ws.onclose = onCloseHandle;
+        ws.onmessage = onMessageHandle;
+
+        function onCloseHandle(evt) {
+            console.log('websocket on disconnect.');
+        };
+        function onOpenHandle(evt){
+            console.log('websocket on connected.');
+        };
+        function onMessageHandle(evt) {
+            var json = JSON.parse(evt.data);
+            console.log(evt.data.length);
+
+            if (json.NetStreamEvent === "NetStreamData") {
+                // json.data is base64 encoded.
+                // Base64 decode to binary data
+
+                //****** VP6F VIDEO DATA ******//
+                var binaryData = toUint8Array(json.data);
+
+                //
+
+            }
+
+        };
+
+        var toUint8Array = function(parStr){
+            //console.log(parStr);
+            var raw = window.atob(parStr);
+            var rawLength = raw.length;
+            var array = new Uint8Array(new ArrayBuffer(rawLength));
+
+            var i;
+            for(i = 0; i < rawLength; i++) {
+                array[i] = raw.charCodeAt(i);
+            }
+            return array;
+        };
+    }
+
+    </script>
+</head>
+<body>
+
+</body>
+</html>
