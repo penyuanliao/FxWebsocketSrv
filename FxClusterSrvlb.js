@@ -27,6 +27,7 @@ var preStream = [];
 initizatial();
 
 function FxClusterSrvlb() {
+
     this.setupIPCBridge();
 };
 
@@ -132,7 +133,6 @@ FxClusterSrvlb.prototype.removeAllEvent = function () {
     process.removeListener("disconnect", this.bridgeDisconnect);
     process.removeListener("message", this.bridgeMessageConversion);
 };
-
 FxClusterSrvlb.prototype.sendStreamData = function (json) {
     var spawnName = json.namespace;
     var clients = server.getClients();
@@ -144,16 +144,32 @@ FxClusterSrvlb.prototype.sendStreamData = function (json) {
     //** 載入問題 **/
     if (!preStream[json.namespace]) preStream[json.namespace] = {};
     var stream = preStream[json.namespace];
-    if (Buffer.byteLength(json.data) > 25000) {
-        stream["IFrame"] = {"NetStreamEvent": "NetStreamData",'keyframe': json.info.keyframe, 'data': json.data};
-        if (!stream.PFrame) stream["PFrame"] = [];
+    var buf_size = Buffer.byteLength(json.data);
+    stream.frameMaximum = Math.max(buf_size, stream.frameMaximum);
+
+    if (stream["keyframe"] > 106) {
         stream.PFrame.length = 0;
+        stream.frameMaximum = buf_size;
     }
-    if (Buffer.byteLength(json.data) < 25000) {
+    if (buf_size > 30000 || buf_size*2 > stream.frameMaximum) {
 
-        if (!stream.PFrame) stream["PFrame"] = [];
+        stream["IFrame"] = {"NetStreamEvent": "NetStreamData",'keyframe': stream["keyframe"], 'data': json.data};
+        if (!stream.PFrame) {
+            stream["PFrame"] = [];
+        }
+        stream["keyframe"] = 0;
+        stream.PFrame.length = 0;
+        console.log('(PFrame)json.info.keyframe', stream["keyframe"], stream.PFrame.length);
+    }
+    else if (buf_size < 30000) {
 
-        stream.PFrame.push({"NetStreamEvent": "NetStreamData",'keyframe': json.info.keyframe, 'data': json.data});
+        if (!stream.PFrame) {
+            stream["PFrame"] = [];
+            stream["keyframe"] = 1;
+        }
+        stream["keyframe"]+=1;
+        console.log('(IFrame)json.info.keyframe', stream["keyframe"], stream.PFrame.length);
+        stream.PFrame.push({"NetStreamEvent": "NetStreamData",'keyframe': stream["keyframe"], 'data': json.data});
     }
 
     if (keys.length == 0) return;
