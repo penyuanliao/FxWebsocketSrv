@@ -10,8 +10,8 @@ const client = fxNetSocket.wsClient;
 const logger = fxNetSocket.logger;
 const os = require('os');
 const v8 = require('v8');
-var NSLog = logger.getInstance();
-NSLog.configure({logFileEnabled:true, level:'info', dateFormat:'[yyyy-MM-dd hh:mm:ss]', maximumFileSize: 1024 * 1024 * 100});
+// var NSLog = logger.getInstance();
+// NSLog.configure({logFileEnabled:true, level:'info', dateFormat:'[yyyy-MM-dd hh:mm:ss]', maximumFileSize: 1024 * 1024 * 100});
 
 util.inherits(socketOwner, events.EventEmitter); // 繼承事件
 

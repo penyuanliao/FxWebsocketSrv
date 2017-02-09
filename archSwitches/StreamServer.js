@@ -16,7 +16,7 @@ const pheaders           = parser.headers;
 const utilities          = fxNetSocket.utilities;
 const daemon             = fxNetSocket.daemon;
 const NSLog              = fxNetSocket.logger.getInstance();
-var cfg = require('../config.js');
+var cfg                  = require('../config.js');
 var IPSec;
 var secPath = path.dirname(__dirname) + "/configfile/SecurityProfile.json";
 fs.readFile(secPath, 'utf8', function (err, data) {
@@ -32,8 +32,13 @@ const evt = require('events');
 const proc = require('child_process');
 // heartbeat wait time before failover triggered in a cluster.
 const heartbeatInterval = 5000;
+const sendWaitClose = 5000;
 const heartbeatThreshold = 12;
 const adminProtocol = 'admin';
+const argFlags = {
+    "HLS.m3u8":"vp62",
+    "Video/WebM":'vp62'
+};
 
 
 /** 多執行緒 **/
@@ -126,7 +131,7 @@ StreamServer.prototype.createLiveStreams = function(fileName) {
             self.rebootStream(this,true);
         }
 
-    };
+    }
 
 };
 
@@ -140,7 +145,7 @@ StreamServer.prototype.streamHeartbeat = function(spawned) {
 
     this.doWaiting[pid]= 0;
     function todo() {
-        debug('stream(%s %s) Heartbeat wait count:%d', spawned.name, pid, self.doWaiting[pid]);
+        // debug('stream(%s %s) Heartbeat wait count:%d', spawned.name, pid, self.doWaiting[pid]);
 
         if (self.doWaiting[pid] >= heartbeatThreshold) { // One minute
             //TODO pro kill -9 pid
@@ -162,14 +167,14 @@ StreamServer.prototype.rebootStream = function(spawned,skip) {
         this.liveStreams[streamName].init();
         this.streamHeartbeat(spawned);
         debug('>> rebootStream:', streamName, this.liveStreams[streamName].ffmpeg_pid);
-    };
+    }
 };
+/****/
 StreamServer.prototype.socketSend = function(handle, spawnName) {
 
     for (var i = 0; i < this.clusters.length; i++) {
         if (this.clusters[i]) {
             this.clusters[i][0].send({'handle':handle,'evt':'socketSend','spawnName':spawnName});
-
         }
 
     }
@@ -181,22 +186,39 @@ StreamServer.prototype.socketSend = function(handle, spawnName) {
  * @param namespace
  * @returns {undefined}
  */
-StreamServer.prototype.assign = function(namespace, cb) {
+StreamServer.prototype.assign = function(namespace /* decoder, cb */) {
     var worker = undefined;
     var num = 0;
     var self = this;
-    if (!self.clusters) {
+    var cb = undefined;
+    var decoder = "H264";
+    var clusters;
+    if (typeof arguments[1] == "function" && arguments[1].constructor == Function) {
+        cb = arguments[1];
+    }else {
+        if (typeof arguments[1] != "undefined") decoder = arguments[1];
+        cb = arguments[2];
+    }
+    if (decoder == "H264")
+        clusters = this.clusters;
+    else
+        clusters = this.clusters2VP6;
+
+    if (!clusters) {
         return;
     }
 
-// url_param
+    // url_param
     if (cfg.balance === "url_param") {
-        cfg.assignRule.asyncEach(function (item, resume) {
+        cfg.assignRule.asyncEach(iteratee, ended);
+        
+        function iteratee(item, resume) {
             if (item.constructor === String) {
+                item = item + "/";
                 console.log('string:id:', item);
                 if (namespace.search(item) != -1) {
                     if (typeof cb !== 'undefined') {
-                        worker = self.clusters[num][0];
+                        worker = (typeof clusters[num] === "undefined") ? undefined :clusters[num][0];
                         if (cb) cb(worker);
                         return;
                     }
@@ -207,11 +229,10 @@ StreamServer.prototype.assign = function(namespace, cb) {
                     i = 0,
                     cunt = item.length;
                 while (i < cunt) {
-                    rule = item[i++];
-
+                    rule = item[i++] + "/";
                     if (namespace.search(rule) != -1) {
 
-                        worker = self.clusters[num][0];
+                        worker = (typeof clusters[num] === "undefined") ? undefined :clusters[num][0];
 
                         // console.log('work -', num, self.clusters.length);
 
@@ -222,26 +243,28 @@ StreamServer.prototype.assign = function(namespace, cb) {
             }
             num++;
             resume();
-        }, function () {
+        }
+        function ended() {
             if (!worker || typeof worker == 'undefined'){
                 debug('ERROR::not found Worker Server:', namespace);
-                if (cb) cb(worker);
+                if (cb) cb(undefined);
             }else {
-            }
 
-        });
+            }
+        }
+        
     }
     else if (cfg.balance === "roundrobin") {
 
-        worker = this.clusters[roundrobinCount++][0];
+        worker = clusters[roundrobinCount++][0];
 
-        if (roundrobinCount >= this.clusters.length) {
+        if (roundrobinCount >= clusters.length) {
             roundrobinCount = 0;
         }
 
         if (cb) cb(worker);
     }else if (cfg.balance === "leastconn") {
-        var cluster = this.clusters[0][0];
+        var cluster = clusters[0][0];
 
         if (!cluster) {
             console.error('Error not found Cluster server');
@@ -279,7 +302,7 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
         var remoteInfo = {};
         handle.getsockname(remoteInfo);
 
-        debug('Client to use the %s request Connections.', handle.mode ,handle.namespace);
+        debug('Client to use the %s request Connections.', handle.mode ,handle.namespace, handle.urlArguments);
 
         if (handle.wsProtocol == adminProtocol && self.ownersEnabled) {
             self.initSocket(handle, buffer);
@@ -296,7 +319,7 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
             }
             if (handle.namespace === "/testline/g1") {
                 self.clusters[0][0].send({'evt':'c_init',data:buffer}, handle,{keepOpen:false});
-                tcp.waithandleClose(5000);
+                tcp.waithandleClose(handle,5000);
                 return;
             }
 
@@ -309,31 +332,47 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
                 handle = null;
                 return;
             };
-
-            if (handle.namespace === "/video/vp6f/video0/") {
-                self.clusters[0][0].send({'evt':'c_init',data:buffer}, handle,{keepOpen:false});
-                tcp.waithandleClose(handle,5000);
-                return;
-            }
-
-            self.assign(handle.namespace, function (worker) {
+            // if (handle.namespace === "/video/shane/shane/") {
+            //     self.clusters[0][0].send({'evt':'c_init',data:buffer}, handle,{keepOpen:false});
+            //     tcp.waithandleClose(handle,5000);
+            //     return;
+            // }
+            var flag = argFlags[handle.urlArguments["d"]];
+            self.assign(handle.namespace, flag , function (worker) {
                 
                 if (typeof worker === 'undefined') {
                     handle.close();
                     tcp.handleRelease(handle);
                 }else{
-                    worker.send({'evt':'c_init',data:buffer}, handle,{keepOpen:false});
+                    worker.send({'evt':'c_init',data:buffer}, handle, {keepOpen:false});
                     tcp.waithandleClose(handle,5000);
                 };
 
             });
-        }else if (handle.mode == 'http' && cfg.httpEnabled){
+        }else if (handle.mode == 'http') {
+            console.log("http urlArguments:",handle.urlArguments["output"]);
 
-            if (!cfg.broadcast) {
+            if (handle.urlArguments["output"] == "http_chunked") {
+                self.assign(handle.namespace, "H264" , function (worker) {
+
+                    if (typeof worker === 'undefined') {
+                        handle.close();
+                        tcp.handleRelease(handle);
+                    }else{
+                        worker.send({'evt':'http_chunked',"data":buffer}, handle, {keepOpen:false});
+                        tcp.waithandleClose(handle, 5000);
+                    }
+
+                });
+
+                return;
+            }
+
+
+            if (cfg.httpEnabled) {
                 var worker = self.clusters[0][0];
-
                 if (typeof worker === 'undefined') return;
-                worker.send({'evt':'c_init',data:buffer}, handle,{keepOpen:false});
+                worker.send({'evt':'c_init',data:buffer}, handle, {keepOpen:false});
                 tcp.waithandleClose(handle,5000);
                 return;
             }
@@ -342,129 +381,12 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
             handle.close();
             tcp.handleRelease(handle);
         }else {
-            console.error('Not found client to use the %s request Connections!!', remoteInfo.address);
+            console.error('Not found client to use the %s request Connections!!', remoteInfo.address, handle.mode);
             handle.close();
             tcp.handleRelease(handle);
         }
 
     });
-
-};
-/**
- *
- * 建立tcp伺服器不使用node net
- * @param opt
- */
-StreamServer.prototype.setupClusterServer = function(opt) {
-    if (!opt) {
-        opt = {'host':'0.0.0.0', 'port': 8080, 'closeWaitTime': 5000,'backlog':511};
-    };
-    var self = this;
-    var err, tcp_handle;
-    try {
-        tcp_handle = new TCP();
-        err = tcp_handle.bind(opt.host, cfg.appConfig.port);
-
-        if (err) {
-            throw new Error(err);
-        };
-
-        err = tcp_handle.listen(opt.backlog);
-
-        if (err) {
-            throw new Error(err);
-        };
-
-        tcp_handle.onconnection = function (err ,handle) {
-
-            if (err) throw new Error("client not connect.");
-
-            handle.onread = onread_url_param;
-            handle.readStart(); //讀header封包
-            //onread_roundrobin(handle); //平均分配資源
-            handle.closeWaiting = setTimeout(function () {
-                debug('CLOSE_WAIT - Wait 5 sec timeout.');
-                handle.close();
-            },opt.closeWaitTime);
-        };
-
-        this.server = tcp_handle;
-    }
-    catch (e) {
-        debug('create server error:', e);
-        tcp_handle.close();
-    };
-
-    /** reload request header and assign **/
-    function onread_url_param(nread, buffer) {
-        var handle = this;
-        // nread > 0 read success
-        if (nread < 0) return;
-
-        if (nread === 0) {
-            debug('not any data, keep waiting.');
-            return;
-        };
-        // Error, end of file.
-        if (nread === uv.UV_EOF) { debug('error UV_EOF: unexpected end of file.'); return;}
-
-        clearTimeout(handle.closeWaiting); //socket error CLOSE_WAIT(passive close)
-
-        var headers = pheaders.onReadTCPParser(buffer);
-        var source = headers.source;
-        var general = headers.general;
-        var isBrowser = (typeof general != 'undefined');
-        var mode = "";
-        var namespace = undefined;
-        if (general) {
-            mode = general[0].match('HTTP/1.1') != null ? "http" : mode;
-            mode = headers.iswebsocket  ? "ws" : mode;
-            namespace = general[1];
-        }else
-        {
-            mode = "socket";
-            namespace = buffer.toString('utf8');
-            namespace = namespace.replace("\0","");
-            console.log('socket - namespace - ', namespace);
-            source = namespace;
-
-            /** switch services code start **/
-
-
-            /** switch services code end**/
-        }
-        if ((buffer.byteLength == 0 || mode == "socket" || !headers) && !headers.swfPolicy) mode = "socket";
-        if (headers.unicodeNull != null && headers.swfPolicy && mode != 'ws') mode = "flashsocket";
-
-        if ((mode === 'ws' && isBrowser) || mode === 'socket' || mode === "flashsocket") {
-
-            self.assign(namespace, function (worker) {
-
-                if (typeof worker === 'undefined') {
-                    handle.close();
-                }else{
-                    worker.send({'evt':'c_init',data:source}, handle,[{ track: false, process: false }]);
-                };
-
-            });
-
-        }else if(mode === 'http' && isBrowser)
-        {
-            var worker = self.clusters[0][0];
-
-            if (typeof worker === 'undefined') return;
-            worker.send({'evt':'c_init',data:source}, handle,[{ track: false, process: false }]);
-        }else {
-            handle.close();
-            handle.readStop();
-            handle = null;
-            return;
-        }
-
-        handle.readStop();
-    };
-
-
 
 };
 
@@ -481,28 +403,51 @@ StreamServer.prototype.setupCluster = function(opt) {
     }
 
     /** cluster start - isMaster **/
-
-    var num = Number(opt.clusterNum);
+    var env = process.env;
+    var num = 0;
+    var mxoss = 0;
+    var assign;
+    var clusters = [];
+    if (typeof opt.cluster == "string") {
+        num = Number(opt.clusterNum);
+    }else {
+        num = Number(opt.cluster.length);
+    }
 
     if (isMaster && num != 0) { // isMaster
         for (var i = 0; i < num; i++) {
 
             // file , fork.settings, args
-            var env = process.env;
             env.NODE_CDID = i;
+            if (opt.cluster[i].assign) assign = utilities.trimAny(opt.cluster[i].assign);
+            mxoss = opt.cluster[i].mxoss || 2048;
             env.PORT = cfg.appConfig.port;
             if(cfg.broadcast == false)
                 env.streamSource = cfg.streamSource.host;
-            //var cluster = proc.fork(opt.cluster,{silent:false}, {env:env});
-            var cluster = new daemon("" + opt.cluster,{silent:false}, {env:env}); //心跳系統
+            var cluster = new daemon(opt.cluster,[],{silent:false, env:env, execArgv:["--nouse-idle-notification","--expose-gc","--max-old-space-size=" + mxoss]}); //心跳系統
             cluster.init();
-            cluster.name = 'channel_' + i;
-            if (!this.clusters[i]) {
-                this.clusters[i] = [];
+            cluster.name = assign;
+            cluster.tag = 'channel_' + i;
+            if (!clusters[i]) {
+                clusters[i] = [];
             }
-            this.clusters[i].push(cluster);
-        };
-    };
+            /*//chnage video namespace
+            cluster.emitter.on('socket_handle', function (message, handle) {
+                var assign = message["where"];
+                for (var j = 0; j < clusters.length; j++) {
+                    var next = clusters[j][0];
+                    if (next.name.indexOf(assign) != -1) {
+                        next.send({'evt':'c_init',data:message["data"]}, handle,{keepOpen:false});
+                        return;
+                    }
+                }
+
+            });
+            */
+            clusters[i].push(cluster);
+        }
+    }
+    return clusters;
     /** cluster end - isMaster **/
 };
 StreamServer.prototype.initCluster = function(opt,id) {
@@ -512,7 +457,7 @@ StreamServer.prototype.initCluster = function(opt,id) {
     env.PORT = cfg.appConfig.port;
     var cluster = new daemon(opt.cluster,{silent:false}, {env:env});
     cluster.init();
-    cluster.name = 'channel_' + env.NODE_CDID;
+    cluster.tag = 'channel_' + env.NODE_CDID;
     if (!this.clusters[id]) {
         this.clusters[id] = [];
     }
@@ -524,7 +469,7 @@ StreamServer.prototype.setupFMSCluster = function (opt) {
     env.PORT = cfg.appConfig.port;
     var cluster = new daemon(opt.cluster,{silent:false}, {env:env});
     cluster.init();
-    cluster.name = 'channel_' + env.NODE_CDID;
+    cluster.tag = 'channel_' + env.NODE_CDID;
     this.fmsSrv = cluster;
 };
 
@@ -555,377 +500,12 @@ StreamServer.prototype.initSocket = function (handle, buf) {
 StreamServer.prototype.createServer = function (clusterEnable) {
     this.clusterEnable = clusterEnable;
     if (this.clusterEnable) {
-        // this.setupClusterServer(cfg.srvOptions);
         this.setupClusterServer2(cfg.srvOptions);
     }else
     {
         // todo single server
     }
 };
-// ================================= //
-//  UDP broadcast Send Other Server  //
-// ================================= //
-StreamServer.prototype.setupTCPBroadcast = function () {
-    console.log('startup setupTCPBroadcast');
-    var self = this;
-    var port = 10080;
-    var bConnections = [];
-    var srv = this.broadcastSrv = net.createServer(function (socket) {
-        console.log('srv socket connection');
-        socket.name = socket.remoteAddress + "\:" + socket.remotePort;
-        bConnections[socket.name] = socket;
-
-        socket.on('close', function () {
-            socket.destroy();
-            bConnections[socket.name] = null;
-            delete bConnections[socket.name];
-        });
-        socket.on('error', function () {
-            socket.destroy();
-        });
-        socket.on('data', function (data) {
-
-            socket.namespace = data.toString('utf8');
-
-            console.log(socket.namespace);
-        });
-    });
-    
-    srv.listen(port);
-
-    this.on('streamData', function (namespace, data, info) {
-
-        var json = {'evt':'streamData','namespace':namespace,'data':data};
-
-        var keys = Object.keys(bConnections);
-
-        for (var i = 0; i < keys.length; i++) {
-            var sock = bConnections[keys[i]];
-            if (!sock || sock == null) return;
-            if (namespace == sock.namespace)
-                sock.write(JSON.stringify(json) +'\0');
-        }
-    });
-
-};
-StreamServer.prototype.setupTCPMulticast = function () {
-
-    console.log('startup setupTCPMulticast');
-
-    // var self = this;
-    var port = 10080;
-    var host = '127.0.0.1';
-    var connections = {};
-    var json;
-    fs.readFile('./configfile/info.json','utf8',function (err,data) {
-        json = JSON.parse(data.toString('utf8'));
-        setupChannel(json["videos"]);
-    });
-
-    var multi = [];
-
-    function setupChannel(videos){
-        console.log('startup setupChannel:',videos.length);
-
-        for (var i = 0; i < videos.length; i++) {
-            var namespace = videos[i];
-            var sock = new net.Socket();
-            sock.namespace = namespace;
-            multi[namespace] = sock;
-            sock.on('connect',function () {
-                console.log('connect ',this.namespace);
-                clearInterval(this.repeated);
-                this.write(this.namespace);
-            });
-            sock.on('data',function (data) {
-                // console.log('data',data.length);
-            });
-            sock.on('close',function () {
-                console.log('setupChannel is close >>>>>');
-                sock.repeated = setInterval(function () {
-                    sock.connect(port, host);
-                },10000);
-            });
-            sock.on('error',function (error) {
-                sock.destroy();
-            });
-
-            sock.connect(port, host);
-
-        }
-
-    }
-
-    var sockPath = path.join(cfg.unixSokConfig.path, cfg.unixSokConfig.filename);
-
-    //delete file
-    try {
-        fs.unlinkSync(sockPath);
-    }
-    catch (e) {
-
-    }
-
-    //common gateway interface
-    var cgiGUID = 0;
-    var cgiSrv = net.createServer(function (socket) {
-        socket.name = "sock_" + cgiGUID++;
-        connections[socket.name] = socket;
-
-        // multi.pipe(socket);
-        socket.on('data', function (chunk) {
-           var str = chunk.toString('utf8');
-            if (typeof multi[str] != 'undefined') {
-                console.log(' pipe:', str);
-                socket.namespace = str;
-                multi[str].pipe(socket);
-            }
-        });
-
-        socket.on('close', function () {
-            var tmp = cgiSrv.connections[socket.name];
-            connections[socket.name] = null;
-            delete connections[socket.name];
-        });
-        socket.on('error', function () {
-            socket.destroy();
-        });
-
-    });
-
-    cgiSrv.listen(sockPath);
-
-    
-};
-
-// ================================= //
-//  Connected form Broadcast Server  //
-// ================================= //
-
-/**
- * a new connection socket of live stream
- * @param host is specified remote address
- * @param port is specified remote port
- * @param namespace is specified path
- * @returns {*|Socket}
- */
-var spawn = require('child_process').spawn;
-StreamServer.prototype.addStreamSocket = function(host, port, namespace) {
-
-    var self = this;
-    // var sock = new socketClient( host, port, namespace, function (data) {
-    //     self.emit('streamData', namespace, data);
-    // });
-    //
-    // return sock;
-
-    var env = process.env;
-    env.NODE_CDID = 0;
-    env.port = port;
-    env.host = host;
-    env.namespace = namespace;
-    env.cpMode = 'spawn';
-    var cluster;
-    if ( env.cpMode != 'spawn') {
-        cluster = proc.fork('./archSwitches/socketClient.js',{silent:false}, {env:env});
-        cluster.on('message',function (data) {
-            console.log(data);
-        })
-    }else {
-        cluster = spawn('node',['./archSwitches/socketClient.js'],{env:env});
-        cluster.vBuf = undefined;
-        cluster.stdout.on('data',function (data) {
-            self.emit('streamData', namespace, data);
-        });
-        cluster.stderr.on('data',function (data) {
-
-        });
-    }
-
-
-    
-    return cluster;
-};
-/***
- * socket classs
- * @param host <string>IPAddress
- * @param port <number>
- * @param namespace <string>
- * @param cb <function>
- */
-function socketClient(host, port, namespace, cb) {
-    this.toBufferData = true;
-    this.isRetry = false;
-    this.trytimeoutObj = 0;
-    this.try_conut = 0;
-    this.host = host;
-    this.port = port;
-    this.namespace = namespace;
-    this.cb = cb;
-    this.init(host,port, namespace);
-}
-
-socketClient.prototype = {
-    init: function (host, port, namespace) {
-        var waitTime = heartbeatInterval;
-        var self = this;
-        var sock = new net.Socket();
-        sock.namespace = namespace;
-        sock.chunkSize = 0;
-        sock.chunkBuffer = undefined;
-        sock.lookout = 0;
-        sock.doWaiting = 0;
-
-        sock.on('connect',onConnected);
-        sock.on('data',onData);
-        sock.on('end', onEnd);
-        sock.on('drain',onDrain);
-        sock.on('close',onClose);
-        sock.on('error', onError);
-        sock.connect(port, host);
-        socketHeartbeat(sock);
-        this.socket = sock;
-        function onConnected() {
-            NSLog.log('info','Connected to %s:%s', host, port,namespace);
-            sock.write(namespace);
-        }
-        function onData(chunk) {
-            sock.doWaiting = 0;
-            if (!sock.chunkBuffer) {
-                sock.chunkBuffer = new Buffer(chunk);
-            }else {
-                sock.chunkBuffer = Buffer.concat([sock.chunkBuffer, chunk], sock.chunkBuffer.length + chunk.length);
-            }
-            sock.chunkSize += chunk.length;
-
-            var pos = sock.chunkBuffer.indexOf('\u0000');
-            if (pos != -1) {
-                var data = sock.chunkBuffer.slice(0, pos);
-
-                pos++;//含/0
-                sock.chunkSize -= pos;
-                sock.chunkBuffer = sock.chunkBuffer.slice(pos, sock.chunkBuffer.length);
-
-                if (data.length <= 0) return;
-
-                if (self.toBufferData) {
-                    if (self.cb && self.cb != null) self.cb(data);
-                }else {
-                    try {
-                        var json = JSON.parse(data.toString('utf8'));
-                        if (json.NetStreamEvent == "NetStreamData") {
-                            if (self.cb && self.cb != null) self.cb(data);
-                        }
-
-                    }
-                    catch (e) {
-                        console.log('onData',data.length);
-                    }
-                }
-            }//check pos ended
-        };
-        function onEnd() {
-            debug('ended.');
-        };
-        function onDrain() {
-            debug('onDrain.');
-        };
-        function onClose() {
-            self.tryAgainLater();
-
-        }
-        function onError(err) {
-
-            NSLog.log('info','socket(%s) %s', self.namespace, err);
-            sock.destroy();
-        }
-        function socketHeartbeat(_socket) {
-            function todo() {
-
-                NSLog.log('trace','heartbeat %s:', _socket.namespace, _socket.doWaiting);
-
-                if (_socket.doWaiting >= 6 ) {
-                    NSLog.log('info' ,'The Socket connect is not responding to client.It need to be reconnect.');
-                    _socket.destroy();
-                    _socket.doWaiting = 0;
-                }else {
-                    _socket.doWaiting++;
-                    _socket.lookout = setTimeout(todo, waitTime)
-                }
-            }
-
-            _socket.lookout = setTimeout(todo, waitTime);
-        }
-
-    },
-    tryAgainLater:function () {
-        var self = this;
-        NSLog.log('trace','Connect Stream %s to try again.', self.namespace);
-
-        if (self.trytimeoutObj != 0) clearTimeout(self.trytimeoutObj);
-        self.trytimeoutObj = setTimeout(function () {
-            self.reconnect();
-
-        },10000);
-
-        if (self.try_conut >= 360) {
-            clearTimeout(self.trytimeoutObj);
-            clearTimeout(self.socket.lookout);
-            self.trytimeoutObj = 0;
-        }
-    },
-    dealloc: function () {
-        this.socket.chunkSize = 0;
-        delete this.socket.chunkBuffer;
-        this.socket.chunkBuffer = null;
-        clearTimeout(this.socket.lookout);
-        clearTimeout(this.trytimeoutObj);
-        this.socket = null;
-    },
-    reconnect: function () {
-        this.socket.chunkSize = 0;
-        delete this.socket.chunkBuffer;
-        this.socket.chunkBuffer = null;
-        clearTimeout(this.socket.lookout);
-        clearTimeout(this.trytimeoutObj);
-        this.try_conut++;
-        this.socket = null;
-        this.init(this.host, this.port, this.namespace);
-    },
-    replaceLine: function (opt) {
-        this.host = opt.host;
-        this.port = opt.port;
-
-        this.try_conut = 0;
-
-        this.tryAgainLater();
-    }
-
-}
-/** 建立連線視訊資料來源 **/
-StreamServer.prototype.createClientStream = function(fileName, host , port) {
-    var sn = fileName;
-    var length = sn.length;
-    var i, _name;
-    debug('Init createLiveStreams on %s:%s', host, port);
-    for (i = 0; i < length; i++) {
-
-        _name = sn[i].toString().match(/^((rtmp[s]?):\/)?\/?([^:\/\s]+)(:([^\/]*))?((\/\w+)*\/)([\w\-\.]+[^#?\s]+)(\?([^#]*))?(#(.*))?$/i);
-
-        if (typeof  _name[6] != 'undefined' && typeof _name[8] != 'undefined') {
-            var pathname = _name[6] + _name[8];
-            // var socket = this.addStreamSocket(host, port, pathname);
-            // this.streamSockets.push({'socket':socket,namespace:pathname});
-        }
-
-    }
-
-    NSLog.log('trace','createLiveStreams is to completion.');
-};
-
-
-
-
 
 StreamServer.prototype.__defineSetter__('httpEnabled', function (enabled) {
    if (typeof enabled == "boolean") {
@@ -995,18 +575,8 @@ StreamServer.prototype.replaceSource = function (URL, cb) {
             }
 
         }
-    };
+    }
 };
-//sample
-// StreamServer.prototype.vp6fStream = function() {
-//     var self = this;
-//     var vp6f = require('../vp6f/libvp62Cl.js');
-//     this.libVP6f = new vp6f();
-//     this.libVP6f.on("videoData", function (obj) {
-//         // console.log('videoData:', obj.data.length);
-//         self.clusters[0].send({'evt':'streamData','namespace':'/video/vp6f/video0/','data':obj.data.toString('base64')});
-//     });
-// };
 
-module.exports = StreamServer;
+module.exports = exports = StreamServer;
 

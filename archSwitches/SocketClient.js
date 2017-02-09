@@ -19,6 +19,9 @@ NSLog.configure({logFileEnabled:true, level:'trace', dateFormat:'[yyyy-MM-dd hh:
  * @param cb <function>
  */
 function socketClient(host, port, namespace, cb) {
+
+
+
     // this.initProcessEvent(); //初始化process事件
     this.toBufferData = false;
     this.isRetry = false;
@@ -34,7 +37,7 @@ function socketClient(host, port, namespace, cb) {
 //     socketClient.super_.prototype.onMessage.apply(this,[data]);
 // };
 socketClient.prototype.init = function (host, port, namespace) {
-    console.log('socketClient init');
+    NSLog.log('trace','socketClient init');
     var waitTime = 30000;
     var self = this;
     var sock = new net.Socket();
@@ -126,7 +129,7 @@ socketClient.prototype.init = function (host, port, namespace) {
         sock.lookout = setTimeout(todo, waitTime);
     }
 
-}
+};
 socketClient.prototype.tryAgainLater = function () {
     var self = this;
     NSLog.log('trace','Connect Stream %s to try again.', self.namespace);
@@ -142,7 +145,7 @@ socketClient.prototype.tryAgainLater = function () {
         clearTimeout(self.socket.lookout);
         self.trytimeoutObj = 0;
     }
-}
+};
 socketClient.prototype.dealloc = function () {
     this.socket.chunkSize = 0;
     delete this.socket.chunkBuffer;
@@ -150,17 +153,22 @@ socketClient.prototype.dealloc = function () {
     clearTimeout(this.socket.lookout);
     clearTimeout(this.trytimeoutObj);
     this.socket = null;
-}
+};
 socketClient.prototype.reconnect = function () {
+    var self = this;
     this.socket.chunkSize = 0;
     delete this.socket.chunkBuffer;
     this.socket.chunkBuffer = null;
     clearTimeout(this.socket.lookout);
     clearTimeout(this.trytimeoutObj);
     this.try_conut++;
-    this.socket = null;
-    this.init(this.host, this.port, this.namespace);
-}
+    // this.socket = null;
+    // this.init(this.host, this.port, this.namespace);
+    this.socket.connect({"host": this.host, "port": this.port}, function () {
+        clearTimeout(self.trytimeoutObj);
+        clearTimeout(self.socket.lookout);
+    })
+};
 socketClient.prototype.replaceLine = function (opt) {
     this.host = opt.host;
     this.port = opt.port;
@@ -168,21 +176,8 @@ socketClient.prototype.replaceLine = function (opt) {
     this.try_conut = 0;
 
     this.tryAgainLater();
-}
+};
 
 
 module.exports = exports = socketClient;
-var env = process.env;
-// env.host = '103.24.83.241';
-// env.port = '80';
-// env.namespace = "/video/daabb/video0/";
-
-// if (env.NODE_CDID) {
-//     var sock = new socketClient( env.host, env.port, env.namespace, function (data) {
-//         if (env.cpMode != 'spawn')
-//             process.send({'evt':'streamData','namespace':env.namespace,'data':data});
-//     });
-//     if (env.cpMode == 'spawn')
-//         sock.socket.pipe(process.stdout);
-// }
 
