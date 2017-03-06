@@ -1,10 +1,16 @@
 {
-  "name": "FxWebsocketSrv",
-  "version": "0.2.0",
-  "private": true,
-  "dependencies": {
-    "debug": "^2.2.0",
-    "ws": "^1.0.1",
-    "fxNetSocket":"https://github.com/penyuanliao/fxNetSocket.git"
-  }
+	"name": "node-videos",
+	"version": "1.0.241",
+	"private": true,
+	"dependencies": {
+		"debug": "^2.2.0",
+		"fxNetSocket": "https://github.com/penyuanliao/fxNetSocket.git",
+		"fxNodeRtmp": "latest",
+		"ws": "^1.0.1"
+	},
+	"scripts": {
+		"start": "sh FxBranchStream.sh",
+		"build": "node ./cmd/automaticVersion.js"
+	},
+	"BuildDate": "2017/3/3 - 21:20"
 }

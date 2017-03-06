@@ -3,35 +3,49 @@
  * --always-compact: always full gc().
  * --expose-gc: manual gc().
  */
-const Log = require('debug');
-const debug = Log('LiveCluster');
-const info = Log('INFO:IPCBridge');
-const fxNetSocket = require('fxNetSocket');
+const Log          = require('debug');
+const debug        = Log('LiveCluster');
+const info         = Log('INFO:IPCBridge');
+const fxNetSocket  = require('fxNetSocket');
 const FxConnection = fxNetSocket.netConnection;
-//var outputStream = fxNetSocket.stdoutStream;
-const parser = fxNetSocket.parser;
-var utilities = fxNetSocket.utilities;
-//var logger = fxNetSocket.logger;
-const fs  = require('fs');
-const path = require('path');
-const net  = require('net');
-const evt = require('events');
-const cfg = require('./config.js');
-const proc = require('child_process');
+const parser       = fxNetSocket.parser;
+const utilities    = fxNetSocket.utilities;
+const NSLog        = fxNetSocket.logger.getInstance();
+const fs           = require('fs');
+const path         = require('path');
+const net          = require('net');
+const cfg          = require('./config.js');
+const NetStream    = require('./vp6f/libvp62Cl.js');
+const NODE_CDID    = process.argv[2];
+NSLog.configure({
+    logFileEnabled:true,
+    consoleEnabled:true,
+    level:'error',
+    dateFormat:'[yyyy-MM-dd hh:mm:ss]',
+    fileName:'vp6Srv_'+ NODE_CDID,
+    filePath:path.dirname(__dirname)+"/node-videos/historyLog",
+    maximumFileSize: 1024 * 1024 * 100});
 /** 多執行緒 **/
 var server = null;
 var count = 0;
 /** 前畫面 **/
 var preStream = [];
+var naluInfoFrame = [];
 
-initizatial();
 
-function FxClusterSrvlb() {
+function FxClusterRTMP() {
+
+    this.initizatial();
+
+    this.videoGroup = [];
 
     this.setupIPCBridge();
+
+    this.setupLivePlaylists();
+
 }
 
-FxClusterSrvlb.prototype.setupIPCBridge = function () {
+FxClusterRTMP.prototype.setupIPCBridge = function () {
 
     var self = this;
 
@@ -44,18 +58,17 @@ FxClusterSrvlb.prototype.setupIPCBridge = function () {
     process.on("message", this.bridgeMessageConversion.bind(this));
 
 };
-FxClusterSrvlb.prototype.bridgeDisconnect = function () {
+FxClusterRTMP.prototype.bridgeDisconnect = function () {
     info("sends a QUIT signal (SIGQUIT)");
     process.exit(0);
 };
-FxClusterSrvlb.prototype.bridgeQuitSignal = function () {
+FxClusterRTMP.prototype.bridgeQuitSignal = function () {
     info("IPC channel exit -1");
     process.exit(-1);
 };
-FxClusterSrvlb.prototype.bridgeMessageConversion = function (data, handle) {
+FxClusterRTMP.prototype.bridgeMessageConversion = function (data, handle) {
     var json = data;
     var socket;
-
     if (typeof json === 'string') {
 
 
@@ -92,26 +105,8 @@ FxClusterSrvlb.prototype.bridgeMessageConversion = function (data, handle) {
             server.app.emit("connection", socket);
             socket.emit("connect");
         }
-        else if (data.evt === 'http_chunked') {
-            socket = new net.Socket({
-                handle:handle,
-                allowHalfOpen:server.app.allowHalfOpen
-            });
-            socket.readable = socket.writable = true;
-            socket.resume();
-            socket.server = this.httpStream.app;
-            this.httpStream.app.emit("connection", socket);
-            socket.emit("connect");
-            var d = new Buffer(data.data);
-            var len = d.indexOf('\r\n\r\n');
-            if (len == -1) len = d.length;
-            d = d.slice(0, len);
-            socket.emit('data', d);
-        }
         else if (data.evt === "streamData") {
-
             this.sendStreamData(data)
-
         }
         else if (data.evt === "c_equal_division") {
             socket = new net.Socket({
@@ -132,7 +127,6 @@ FxClusterSrvlb.prototype.bridgeMessageConversion = function (data, handle) {
         }else if (data.evt === "sourceStream") {
 
 
-
         }
 
     }else
@@ -140,12 +134,12 @@ FxClusterSrvlb.prototype.bridgeMessageConversion = function (data, handle) {
         process.stdout.write('out of hand. dismiss message.\n');
     }
 };
-FxClusterSrvlb.prototype.removeAllEvent = function () {
+FxClusterRTMP.prototype.removeAllEvent = function () {
     process.removeListener("SIGQUIT", this.bridgeQuitSignal);
     process.removeListener("disconnect", this.bridgeDisconnect);
     process.removeListener("message", this.bridgeMessageConversion);
 };
-FxClusterSrvlb.prototype.sendStreamData = function (json) {
+FxClusterRTMP.prototype.sendStreamData = function (json) {
     var spawnName = json.namespace;
     var clients = server.getClients();
     var keys = Object.keys(clients);
@@ -157,31 +151,22 @@ FxClusterSrvlb.prototype.sendStreamData = function (json) {
     if (!preStream[json.namespace]) preStream[json.namespace] = {};
     var stream = preStream[json.namespace];
     var buf_size = Buffer.byteLength(json.data);
-    stream.frameMaximum = Math.max(buf_size, stream.frameMaximum);
 
-    if (stream["keyframe"] > 106) {
-        stream.PFrame.length = 0;
-        stream.frameMaximum = buf_size;
-    }
-    if (buf_size > 30000 || buf_size*2 > stream.frameMaximum) {
+    if (json.keyframe == 0x14 || json.keyframe == 0x17) {
 
-        stream["IFrame"] = {"NetStreamEvent": "NetStreamData",'keyframe': stream["keyframe"], 'data': json.data};
-        if (!stream.PFrame) {
-            stream["PFrame"] = [];
-        }
-        stream["keyframe"] = 0;
-        stream.PFrame.length = 0;
+        // stream["KeyFrame"] = {"NetStreamEvent": "NetStreamData",'keyframe': json.keyframe+1,"d":'m3u8', 'data': json.data};
+        stream["KeyFrame"] = {"NetStreamEvent": "NetStreamData",'t':json.ts, 'data': json.data};
+        if (!stream.IFrame) stream["IFrame"] = [];
+        stream.IFrame = [];
         // console.log('(PFrame)json.info.keyframe', stream["keyframe"], stream.PFrame.length);
     }
-    else if (buf_size < 30000) {
+    else if (json.keyframe == 0x24 || json.keyframe == 0x27) {
 
-        if (!stream.PFrame) {
-            stream["PFrame"] = [];
-            stream["keyframe"] = 1;
-        }
-        stream["keyframe"]+=1;
+        if (!stream.IFrame) stream["IFrame"] = [];
+
         // console.log('(IFrame)json.info.keyframe', stream["keyframe"], stream.PFrame.length);
-        stream.PFrame.push({"NetStreamEvent": "NetStreamData",'keyframe': stream["keyframe"], 'data': json.data});
+        // stream.IFrame.push({"NetStreamEvent": "NetStreamData",'keyframe': json.keyframe+1,"d":'m3u8', 'data': json.data});
+        stream.IFrame.push({"NetStreamEvent": "NetStreamData",'t': json.ts, 'data': json.data});
     }
 
     if (keys.length == 0) return;
@@ -192,8 +177,9 @@ FxClusterSrvlb.prototype.sendStreamData = function (json) {
                 var str = "";
                 if (json.data.type == 'Buffer'){
                     str = new Buffer(json.data.data);
-                }else{
-                    str = JSON.stringify({"NetStreamEvent": "NetStreamData",'type':json.info.sliceType,'keyframe': json.info.keyframe, 'data': json.data});
+                } else {
+                    // str = JSON.stringify({"NetStreamEvent": "NetStreamData",'keyframe': json.keyframe+1,"d":'m3u8', 'data': json.data});
+                    str = JSON.stringify({"NetStreamEvent": "NetStreamData",'t':json.ts,'data': json.data});
                 }
 
                 //debug('INFO::::%s bytes', Buffer.byteLength(str));
@@ -212,117 +198,126 @@ FxClusterSrvlb.prototype.sendStreamData = function (json) {
     }
     keys = null;
 };
-/***
- * change video tag
- * @param socket
- * @param assign move process
- */
-FxClusterSrvlb.prototype.jumpShip = function (socket, assign) {
-    var data      = socket.relatedData.toString();
-    var namespace = socket.namespace;
-    data.replace(namespace, assign);
+FxClusterRTMP.prototype.setupLivePlaylists = function() {
+    var self = this;
+    var CDID = NODE_CDID;
+    var assign = cfg.assignRule[CDID];
+    var assignLives = cfg.assignLives;
 
-    process.send({"evt":"socket_handle", "data": data, 'where':assign}, socket._handle);
+    for (var i = 0; i < assign.length; i++) {
+        var obj = assign[i];
+
+        var liveStreams = assignLives[obj];
+        if (typeof liveStreams == "undefined") {
+            liveStreams = assignLives["default"];
+        }
+        for (var j = liveStreams["streamName"].length - 1; j >= 0; j--) {
+            var streamName = liveStreams["streamName"][j]; //
+            var options = {
+                bFMSHost:liveStreams["bFMSHost"],
+                bFMSPort:liveStreams["bFMSPort"],
+                videoPaths:'/video/' + obj + "/" + streamName
+            };
+            connectRTMPStream(options, 200*i);
+        }
+
+    }
+
+    function connectRTMPStream(options, delay) {
+        setTimeout(function () {
+            NSLog.log("error", "createFMSStream:", options);
+            self.createFMSStream(options);
+        }, delay)
+    }
+    // next week 3;
+    var d = new Date();
+    d.setDate(d.getDate() - d.getDay() + 10);
+    d.setHours(11);
+    var waitWeek = d.getTime() - (new Date().getTime());
     setTimeout(function () {
-        socket.destroy();
-    },5000);
-};
-var log = require('fxNodeRtmp').AMFLOG;
-FxClusterSrvlb.prototype.createHTTPStreamReceive = function () {
-    var httpStream = this.httpStream = new FxConnection(cfg.appConfig.port,{runListen: false});
-    httpStream.on('connection', onConnection);
-    httpStream.on('message', onMessage);
-    httpStream.on('disconnect', onDisconnect);
-    httpStream.on('httpUpgrade', onHttpUpgrade);
-    httpStream.on('data', onData);
-
-    function onConnection(client) {
-        console.log('connection');
-    }
-    function onMessage(event) {
-
-    }
-    function onDisconnect(name) {
-
-    }
-    function onHttpUpgrade(req, client, head) {
-
-    }
-    function onData(chunk, namespace) {
-
-        var offset  = chunk.indexOf('\r\n\r\n');
-        var chunked;
-        var data;
-        var size;
-        if (offset == -1) {
-            offset = chunk.indexOf('\r\n');
-            chunked = chunk.slice(2,chunk.length);
-        }else {
-            chunked = chunk.slice(4,chunk.length);
-        }
-        var end  = chunked.indexOf('\r\n');
-
-        var end2 = data.indexOf('\r\n');
-        if (offset < 10) {
-            console.log(parseInt(chunk.slice(0, offset).toString(),16), chunk.length, offset);
-        }
-        /*
-        while (offset == -1) {
-            offset = chunk.indexOf("\r\n");
-            size = parseInt(chunk.slice(0,offset).toString(),16);
-            offset+=2;
-            data = chunk.slice(offset, offset + size);
-            chunk = chunk.slice(offset + size, chunk.length);
-        }
-        */
-
-        // log.logHex(chunk.slice(0,50));
-    }
+        self.automaticMaintenance();
+    }, waitWeek);
 };
 
+FxClusterRTMP.prototype.automaticMaintenance = function () {
+    NSLog.log("warning", "automatic Maintenance...");
+    var time = new Date();
+    var keys = Object.keys(this.videoGroup);
+    var key,stream,i;
+    if (time.getDay() == 3 && time.getHours() >= 11 ) {
+        // this.setupLivePlaylists();
+        for (i = 0; i < keys.length; i++) {
+            key = keys[i];
+            stream = this.videoGroup[key];
+            if (typeof stream == "undefined" && typeof stream["rtmp"] == "undefined" && stream["rtmp"].writable == false) {
+                NSLog.log("error", "[Check] %s is Stop ~~~~~~~~~~~~", stream["rtmp"].name);
+            }
+        }
+    }
 
-module.exports = exports = FxClusterSrvlb;
+};
 
-new FxClusterSrvlb();
+/**
+ * create socket connect to fms server
+ * @param options {object}
+ */
+FxClusterRTMP.prototype.createFMSStream = function (options) {
+    var fileName = options.videoPaths;
+    var self = this;
+    var s = self.videoGroup[fileName] = new NetStream(options);
+    s.on('onVideoData', function (data, keyframe, timestamp) {
+        self.sendStreamData({'evt':'streamData', 'namespace':fileName, "keyframe":keyframe, "muxer":s.muxer, "ts": timestamp, "data":data})
+    });
+    s.on('error', function (e) {
+        // s.removeAllListeners();
+        // s = undefined;
+        // self.vClient(fileName);
+    });
+    s.on("naluInfo", function (base64) {
+        naluInfoFrame[fileName] = base64;
+    });
 
-/** cluster ended **/
-
-function initizatial() {
-
+};
+/** init 80 listen server communicate with webSocket, socket, flashSocket **/
+FxClusterRTMP.prototype.initizatial = function () {
     var srv = new FxConnection(cfg.appConfig.port,{runListen: false});
     setupCluster(srv);
     server = srv;
-}
+};
+
+module.exports = exports = FxClusterRTMP;
+/** start server **/
+var cluster = new FxClusterRTMP();
 
 function setupCluster(srv) {
 
     srv.on('Listening', function (app) {
         debug('Listening...cluster');
     });
+    srv.setBinaryType = "arraybuffer";
+    // srv.setContentEncode = "br";
+    srv.on('connection', function (client) {
+        debug('clients:',client.name, client.wsProtocol);
+        client.write(JSON.stringify({"NetStreamEvent":"NetConnect.Success","detail":client.namespace + "-" + NODE_CDID}));
+        // client.binaryType = "arraybuffer";
+        //H264 avc1 NALU INFO
+        if (typeof naluInfoFrame[client.namespace] != "undefined") {
+            client.write(JSON.stringify({"NetStreamEvent":"NetStreamData","keyframe":17,"data":naluInfoFrame[client.namespace]}));
+        }
 
-    srv.on('connection', function (socket) {
-        debug('clients:',socket.name);
 
-        var stream = preStream[socket.namespace];
+        var stream = preStream[client.namespace];
 
         if (!stream) return;
 
+        if (!stream.KeyFrame) return;
+        client.write(JSON.stringify(preStream[client.namespace].KeyFrame));
+
         if (!stream.IFrame) return;
 
-        write(socket, preStream[socket.namespace].IFrame);
-
-        if (!stream.PFrame) return;
-
-        for (var i = 0; i < stream.PFrame.length; i++) {
-            var obj = stream.PFrame[i];
-
-            if (socket.mode == 'socket') {
-                socket.write(JSON.stringify(obj) + '\0');
-            }else
-            {
-                socket.write(JSON.stringify(obj));
-            }
-
+        for (var i = 0; i < stream.IFrame.length; i++) {
+            var obj = stream.IFrame[i];
+            client.write(JSON.stringify(obj));
         }
 
     });
@@ -339,8 +334,6 @@ function setupCluster(srv) {
 
             if (json["event"] == 'PingEvent'){
                 evt.client.write(JSON.stringify({"event":"PingEvent","data":json['data']}));
-            }else if (json["event"] == "jumpShip") {
-                self.jumpShip(evt.client.socket, json["data"]);
             }
 
         }
@@ -349,7 +342,7 @@ function setupCluster(srv) {
         };
     });
     /** client socket destroy **/
-    srv.on('disconnect', function (name) {
+    srv.on('disconnect', function (socket) {
         debug('disconnect_fxconnect_client.');
         //socket.removeListener('connection', callback);
     });
@@ -376,8 +369,7 @@ function setupCluster(srv) {
         var _get = head[0].split(" ");
 
         var socket = client.socket;
-        console.log('get:::', _get[0]);
-        if (_get[1] === "/load-test.html") {
+        if (_get[1] === "/") {
             var file = path.join(__dirname, '/public/views/load-test.html');
             fs.readFile(file, function (err, data) {
                 successfulHeader(200, socket, "html");
@@ -386,15 +378,7 @@ function setupCluster(srv) {
                 //client.close();
             });
         }
-        else if (_get[1] === "/video.html") {
-            var file = path.join(__dirname, '/public/views/Video.html');
-            fs.readFile(file, function (err, data) {
-                successfulHeader(200, socket, "html");
-                socket.write(data);
-                socket.end();
-                //client.close();
-            });
-        }else if (_get[1] === "VP6Fjs/video.html") {
+        if (_get[1] === "/video.html") {
             var file = path.join(__dirname, '/public/views/Video.html');
             fs.readFile(file, function (err, data) {
                 successfulHeader(200, socket, "html");
@@ -424,15 +408,6 @@ function setupCluster(srv) {
             var fileWriteStream1 = fs.createReadStream(file);
             fileWriteStream1.pipe(socket);
             //successfulHeader(200, socket, { 'Content-Type' : 'image/png'});
-        }
-        else if (_get[1].indexOf('.css') != -1) {
-            var file = path.join(__dirname, '/public', _get[1]);
-            fs.readFile(file, function (err, data) {
-                successfulHeader(200, socket, "text/css");
-                socket.write(data);
-                socket.end();
-                //client.close();
-            });
         }
         else
         {
@@ -468,11 +443,6 @@ function setupCluster(srv) {
         }
 
     });
-
-    srv.on('data',function (chunk) {
-        console.log('chunk:', chunk.toString());
-    });
-
     /**
      * @param code: response header Status Code
      * @param socket: client socket
@@ -548,20 +518,10 @@ function socketSend(evt, spawnName) {
 
 }
 
-function write(socket, obj) {
-    if (socket.mode == 'socket') {
-        socket.write(JSON.stringify(obj) + '\0');
-    }else
-    {
-        socket.write(JSON.stringify(obj));
-    }
-
-}
-
-/* ------- ended testing logger ------- */     
+/* ------- ended testing logger ------- */
 
 process.on('uncaughtException', function (err) {
-    console.error(err.stack);
+    NSLog.log('error',err.stack);
 });
 
 

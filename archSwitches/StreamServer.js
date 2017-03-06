@@ -324,7 +324,7 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
             }
 
             //TODO fms vp6f sample
-            console.log("handle.namespace : ",handle.namespace);
+
             //過濾不明的namesapce
             if (handle.namespace.substr(0,1) != "/") {
                 handle.close();
@@ -338,8 +338,9 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
             //     return;
             // }
             var flag = argFlags[handle.urlArguments["d"]];
+            console.log("handle.namespace : ", handle.namespace,flag);
             self.assign(handle.namespace, flag , function (worker) {
-                
+
                 if (typeof worker === 'undefined') {
                     handle.close();
                     tcp.handleRelease(handle);
@@ -424,7 +425,7 @@ StreamServer.prototype.setupCluster = function(opt) {
             env.PORT = cfg.appConfig.port;
             if(cfg.broadcast == false)
                 env.streamSource = cfg.streamSource.host;
-            var cluster = new daemon(opt.cluster,[],{silent:false, env:env, execArgv:["--nouse-idle-notification","--expose-gc","--max-old-space-size=" + mxoss]}); //心跳系統
+            var cluster = new daemon(opt.cluster,[i],{silent:false, env:env, execArgv:["--nouse-idle-notification","--expose-gc","--max-old-space-size=" + mxoss]}); //心跳系統
             cluster.init();
             cluster.name = assign;
             cluster.tag = 'channel_' + i;
