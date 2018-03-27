@@ -37,7 +37,8 @@ const heartbeatThreshold = 12;
 const adminProtocol = 'admin';
 const argFlags = {
     "HLS.m3u8":"vp62",
-    "Video/WebM":'vp62'
+    "Video/WebM":'vp62',
+    "Video/FLV":"FLV"
 };
 
 
@@ -74,6 +75,7 @@ function StreamServer() {
     // this.vp6fStream();
     /** 橋接層是否開啟網頁測試 **/
     cfg.httpEnabled = false;
+    this.userInofEcho   = {};
     utilities.autoReleaseGC();
 };
 StreamServer.prototype.onMessage = function (data) {
@@ -193,16 +195,23 @@ StreamServer.prototype.assign = function(namespace /* decoder, cb */) {
     var cb = undefined;
     var decoder = "H264";
     var clusters;
+    var rule = cfg.assignRule;
     if (typeof arguments[1] == "function" && arguments[1].constructor == Function) {
         cb = arguments[1];
     }else {
         if (typeof arguments[1] != "undefined") decoder = arguments[1];
         cb = arguments[2];
     }
-    if (decoder == "H264")
+    if (decoder == "H264") {
         clusters = this.clusters;
-    else
+    }
+    else if (decoder == "FLV") {
+        clusters = this.clusters2FLV;
+        rule = cfg.assignRule2;
+    }
+    else {
         clusters = this.clusters2VP6;
+    }
 
     if (!clusters) {
         return;
@@ -210,7 +219,8 @@ StreamServer.prototype.assign = function(namespace /* decoder, cb */) {
 
     // url_param
     if (cfg.balance === "url_param") {
-        cfg.assignRule.asyncEach(iteratee, ended);
+
+        rule.asyncEach(iteratee, ended);
         
         function iteratee(item, resume) {
             if (item.constructor === String) {
@@ -239,6 +249,8 @@ StreamServer.prototype.assign = function(namespace /* decoder, cb */) {
                         if (cb) cb(worker);
                         return;
                     }
+                    console.log(rule, namespace);
+
                 }
             }
             num++;
@@ -300,14 +312,37 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
 
         handle.readStop();
         var remoteInfo = {};
-        handle.getsockname(remoteInfo);
+        handle.getpeername(remoteInfo);
 
-        debug('Client to use the %s request Connections.', handle.mode ,handle.namespace, handle.urlArguments);
+        NSLog.log("error",'Client to use the %s request Connections.', handle.mode ,handle.namespace, handle.urlArguments);
 
         if (handle.wsProtocol == adminProtocol && self.ownersEnabled) {
             self.initSocket(handle, buffer);
             return;
         }
+        if (typeof self.userInofEcho[remoteInfo.address] == "undefined") self.userInofEcho[remoteInfo.address] = {tries:0, times:new Date().getTime(), locked:false};
+        if ((new Date().getTime() - self.userInofEcho[remoteInfo.address].times) > 60000) {
+            var now = new Date().getTime();
+            if (self.userInofEcho[remoteInfo.address].tries > 1500) {
+                self.userInofEcho[remoteInfo.address].locked = now + 600000;
+            }
+            var tries = self.userInofEcho[remoteInfo.address].tries;
+            self.userInofEcho[remoteInfo.address].times = now;
+            self.userInofEcho[remoteInfo.address].tries = 0;
+            //開始檢查
+            if ((now - self.userInofEcho[remoteInfo.address].locked) > 0) {
+                // 10 min locked
+                self.userInofEcho[remoteInfo.address].locked = 0;
+            } else {
+                NSLog.log('error','Client connections count:%s too much...Lucked IP:%s', tries, remoteInfo.address);
+                handle.close();
+                tcp.handleRelease(handle);
+                return;
+            }
+
+        }
+        self.userInofEcho[remoteInfo.address].tries++;
+
 
         if(handle.mode == 'ws' || handle.mode == 'socket' || handle.mode == 'flashsocket') {
 
@@ -351,8 +386,7 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
 
             });
         }else if (handle.mode == 'http') {
-            console.log("http urlArguments:",handle.urlArguments["output"]);
-
+            /*
             if (handle.urlArguments["output"] == "http_chunked") {
                 self.assign(handle.namespace, "H264" , function (worker) {
 
@@ -368,7 +402,7 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
 
                 return;
             }
-
+            */
 
             if (cfg.httpEnabled) {
                 var worker = self.clusters[0][0];
@@ -377,8 +411,7 @@ StreamServer.prototype.setupClusterServer2 = function (opt) {
                 tcp.waithandleClose(handle,5000);
                 return;
             }
-
-            debug('The client(%s:%s) try http request but Not Support HTTP procotol.',remoteInfo.address, remoteInfo.port);
+            NSLog.log("error", 'The client(%s:%s) try(%s) http request (%s) but Not Support HTTP procotol.', remoteInfo.address, remoteInfo.port, remoteInfo.address + ":" + remoteInfo.port, handle.namespace);
             handle.close();
             tcp.handleRelease(handle);
         }else {

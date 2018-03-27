@@ -10,27 +10,62 @@ config.env = process.env.NODE_ENV;
  * Backlog: pending connections
  * **/
 config.numCPUs = require('os').cpus().length;
-
-config.assignRule = [['daabb','dabbb'],['daabc','daadb','daafb'],['daabd','daacb','dabcb'],['daabg','daabh','dabfb'],['daaib','daahb','dabeb'],['daabdg','daagb'],['daabdh','dabab']];
+// config.assignRule = [['daabb','daacb'],['daabc','daadb','daafb'],['daabd','dabcb'],['daabg','daabh','dabfb'],['daaib','daahb','dabeb'],['daabdg','daagb'],['daabdh','dabab','dabgb'],['dabbb','daaie','daadg']];
+config.assignRule = [["daabb"]];
+config.assignRule2 = [["demo1"]];
+config.assignLives = {
+    "daacb": {
+        "streamName":["video0","video1","video2"],
+        "bFMSHost":"103.24.83.229",
+        "bFMSPort":1935
+    },
+    "daagb": {
+        "streamName":["video0","video1","video2"],
+        "bFMSHost":"103.24.83.229",
+        "bFMSPort":1935
+    },
+    "shane": {
+        "streamName":["shane"],
+        "bFMSHost":"127.0.0.1",
+        "bFMSPort":1935
+    },
+    "default": {
+        "streamName":["video0"],
+        "bFMSHost":"183.182.64.182",
+        "bFMSPort":1935
+    }
+};
 
 if (config.env == 'development') {
-    config.rtmpHostname = "183.182.79.162";
-    config.stream_proc = "ffmpeg";
+    config.rtmpHostname = "43.251.79.212";
+    config.stream_proc = "/Users/Benson/Documents/Libraries/ffmpeg";
     config.srvOptions = {
         'host': '0.0.0.0',
         'port': config.appConfig.port,
         'closeWaitTime':5000, // Setting close_wait timeout
         'backlog': 511
     };
-    config.forkOptions = {
-        'webCluster':'',
-        'webNum':0,
-        'cluster': './FxClusterSrvlb.js',
-        'clusterNum': 2
-    };
+    config.forkOptions = [
+        {
+            "name":"H264",
+            'webCluster':'',
+            'webNum':0,
+            'cluster': './FxClusterSrvlb.js',
+            'clusterNum': 1
+        },
+        {
+            "name":"VP62",
+            'cluster': './FxClusterSrvlbVP6.js',
+            'clusterNum': 1
+        },
+        {
+            "name": "FLV",
+            'cluster': './FxMediaServer.js',
+            'clusterNum': 1
+        }];
 }
 else {
-    if (!config.rtmpHostname) config.rtmpHostname = "192.168.1.171";
+    if (!config.rtmpHostname) config.rtmpHostname = "127.0.0.1";
     config.stream_proc = "ffmpeg";
     config.srvOptions = {
         'host': '0.0.0.0',
@@ -38,13 +73,21 @@ else {
         'closeWaitTime':5000, // Setting close_wait timeout
         'backlog': 511
     };
-    config.forkOptions = {
-        'webCluster':'',
-        'webNum':0,
-        'cluster': './FxClusterSrvlb.js',
-        'clusterNum': config.assignRule.length
-    };
+    config.forkOptions = [
+        {
+            "name":"H264",
+            'webCluster':'',
+            'webNum':0,
+            'cluster': './FxClusterSrvlb.js',
+            'clusterNum': 0
+        },
+        {
+            "name":"VP62",
+            'cluster': './FxClusterSrvlbVP6.js',
+            'clusterNum': 0
+        }];
 }
+
 
 //if (config.assignRule.length < config.forkOptions.num) throw new Error("assignRule != forkOptions.num");
 config.rtmpPort = 1935;
@@ -102,7 +145,8 @@ function appParames(){
                 }
             };
         };
-    });
+
+            });
 
     return args;
 }
