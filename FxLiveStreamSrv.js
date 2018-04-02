@@ -277,7 +277,7 @@ function swpanedClosed(code){
         rebootStream(this,true);
     }
 
-    logger.reachabilityWithHostName(cfg.videoDomainName);
+    // logger.reachabilityWithHostName(cfg.videoDomainName);
 
 };
 /** 觀察記憶體使用狀況 **/
@@ -289,7 +289,7 @@ function observerTotoalUseMem() {
         resume();
         pids.push(liveStreams[element].ffmpeg.pid);
     }, function() {
-        logger.logTotalMemoryUsage(pids);
+        // logger.logTotalMemoryUsage(pids);
     });
 
 }

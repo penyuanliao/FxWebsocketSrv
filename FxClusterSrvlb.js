@@ -29,6 +29,7 @@ initizatial();
 function FxClusterSrvlb() {
 
     this.setupIPCBridge();
+    makeSureComplete();
 }
 
 FxClusterSrvlb.prototype.setupIPCBridge = function () {
@@ -564,4 +565,8 @@ process.on('uncaughtException', function (err) {
     console.error(err.stack);
 });
 
-
+function makeSureComplete() {
+    if (process.send instanceof Function) {
+        process.send({"action":"creationComplete"});
+    }
+}

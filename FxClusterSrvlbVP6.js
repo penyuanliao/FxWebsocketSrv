@@ -18,7 +18,7 @@ const cfg          = require('./config.js');
 const NetStream    = require('./vp6f/libvp62Cl.js');
 const NODE_CDID    = process.argv[2];
 NSLog.configure({
-    logFileEnabled:true,
+    logFileEnabled:false,
     consoleEnabled:true,
     level:'error',
     dateFormat:'[yyyy-MM-dd hh:mm:ss]',
@@ -42,6 +42,8 @@ function FxClusterRTMP() {
     this.setupIPCBridge();
 
     this.setupLivePlaylists();
+
+    makeSureComplete();
 
 }
 
@@ -230,13 +232,7 @@ FxClusterRTMP.prototype.setupLivePlaylists = function() {
         }, delay)
     }
     // next week 3;
-    var d = new Date();
-    d.setDate(d.getDate() - d.getDay() + 10);
-    d.setHours(11);
-    var waitWeek = d.getTime() - (new Date().getTime());
-    setTimeout(function () {
-        self.automaticMaintenance();
-    }, waitWeek);
+
 };
 
 FxClusterRTMP.prototype.automaticMaintenance = function () {
@@ -274,6 +270,7 @@ FxClusterRTMP.prototype.createFMSStream = function (options) {
         // self.vClient(fileName);
     });
     s.on("naluInfo", function (base64) {
+        console.log('naluInfo');
         naluInfoFrame[fileName] = base64;
     });
 
@@ -281,6 +278,7 @@ FxClusterRTMP.prototype.createFMSStream = function (options) {
 /** init 80 listen server communicate with webSocket, socket, flashSocket **/
 FxClusterRTMP.prototype.initizatial = function () {
     var srv = new FxConnection(cfg.appConfig.port,{runListen: false});
+    srv.userPingEnabled = true;
     setupCluster(srv);
     server = srv;
 };
@@ -411,7 +409,7 @@ function setupCluster(srv) {
         }
         else
         {
-             if (_get[1] === "/favicon.ico") {
+            if (_get[1] === "/favicon.ico") {
                 successfulHeader(200, socket, "image/x-icon");
             }else {
                 successfulHeader(200, socket, "js");
@@ -524,4 +522,8 @@ process.on('uncaughtException', function (err) {
     NSLog.log('error',err.stack);
 });
 
-
+function makeSureComplete() {
+    if (process.send instanceof Function) {
+        process.send({"action":"creationComplete"});
+    }
+}

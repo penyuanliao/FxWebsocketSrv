@@ -1,9 +1,10 @@
 {
 	"name": "node-videos",
-	"version": "1.0.241",
+	"version": "1.0.359",
 	"private": true,
 	"dependencies": {
 		"debug": "^2.2.0",
+		"flv.js": "^1.4.2",
 		"fxNetSocket": "https://github.com/penyuanliao/fxNetSocket.git",
 		"fxNodeRtmp": "latest",
 		"ws": "^1.0.1"
@@ -12,5 +13,5 @@
 		"start": "sh FxBranchStream.sh",
 		"build": "node ./cmd/automaticVersion.js"
 	},
-	"BuildDate": "2017/3/3 - 21:20"
+	"BuildDate": "2018/4/2 - 15:9"
 }

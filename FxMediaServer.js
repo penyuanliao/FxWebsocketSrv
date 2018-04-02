@@ -36,10 +36,6 @@ function FxMediaServer() {
     this.batchConnStreaming();
 
     this.setupIPCBridge();
-
-    setInterval(function () {
-        fs.writeFileSync("./historyLog/date.txt", new Date().toLocaleTimeString());
-    }, 100)
 }
 FxMediaServer.prototype.setupServer = function () {
     var srv = new FxConnection(8002,{runListen: isCluster, glListener:false, baseEvtShow: false});
@@ -67,7 +63,8 @@ FxMediaServer.prototype.onConnection = function (client) {
 
     if (typeof self.userAgent[client.namespace] == "undefined") self.userAgent[client.namespace] = {};
     self.userAgent[client.namespace][client.name] = client;
-    client.write(self.videoProxies[client.namespace].fileHeader);
+    if (typeof self.videoProxies[client.namespace].fileHeader != "undefined")
+        client.write(self.videoProxies[client.namespace].fileHeader);
     client.on("disconnect", function (name) {
         self.userAgent[client.namespace][name] = undefined;
         delete self.userAgent[client.namespace][name];
@@ -113,7 +110,8 @@ FxMediaServer.prototype.batchConnStreaming = function () {
             var options = {
                 bFMSHost:liveStreams["bFMSHost"],
                 bFMSPort:liveStreams["bFMSPort"],
-                videoPaths:'/video/' + obj + "/" + streamName
+                videoPaths:'/video/' + obj + "/" + streamName,
+                audio_support:true
             };
             connectRTMPStream(options, 200*j);
         }
@@ -151,6 +149,9 @@ FxMediaServer.prototype.createLiveStreaming = function (options) {
         self.httpBroadcast(clients, data, fileName);
 
     });
+    streaming.on("onGetFPS", function (data) {
+        // console.log(data);
+    })
 };
 FxMediaServer.prototype.broadcast = function (clients, data, fileName) {
     var keys = Object.keys(clients);
